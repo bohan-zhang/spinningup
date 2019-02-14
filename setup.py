@@ -28,7 +28,7 @@ setup(
         'seaborn==0.8.1',
         'tensorflow>=1.8.0',
         'tqdm',
-        'stable-baselines'
+        'baselines'
     ],
     description="Teaching tools for introducing people to deep RL.",
     author="Joshua Achiam",

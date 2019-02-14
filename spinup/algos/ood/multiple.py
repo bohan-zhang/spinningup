@@ -8,7 +8,7 @@ from spinup.algos.td3 import core as td3_core
 from spinup.algos.ood.sac import SAC
 from spinup.algos.ood.ddpg import DDPG
 from spinup.algos.ood.td3 import TD3
-from stable_baselines.common.vec_env import SubprocVecEnv
+from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 
 
 class ReplayBuffer:
@@ -44,10 +44,12 @@ class ReplayBuffer:
 
 def run_multiple(algorithms, replay_buffer, env_fn, batch_size=100, epochs=100, max_ep_len=1000, start_steps=10000,
                  steps_per_epoch=5000, sample_from=tuple([])):
-    envs = SubprocVecEnv([env_fn for _ in algorithms])
     start_time = time.time()
     total_steps = steps_per_epoch * epochs
-    steps = [[a.env.reset(), None, 0, False, 0, 0] for a in algorithms]  # o, o2, r, d, ep_ret, ep_len
+
+    envs = SubprocVecEnv([env_fn for _ in algorithms])
+    obs = envs.reset()
+    steps = [[obs[i], None, 0, False, 0, 0] for i in range(len(algorithms))]  # o, o2, r, d, ep_ret, ep_len
 
     # Main loop: collect experience in env and update/log each epoch
     for t in range(total_steps):
@@ -71,7 +73,9 @@ def run_multiple(algorithms, replay_buffer, env_fn, batch_size=100, epochs=100, 
         o2_s, r_s, d_s, _ = envs.step(actions)
 
         for i in range(len(algorithms)):
-            o, o2, r, d, ep_ret, ep_len = steps[i]
+            o, _, _, _, ep_ret, ep_len = steps[i]
+            o2 = o2_s[i]
+            r = r_s[i]
 
             ep_ret += r_s[i]
             ep_len += 1
@@ -109,11 +113,11 @@ def run_multiple(algorithms, replay_buffer, env_fn, batch_size=100, epochs=100, 
 
             for i in range(len(algorithms)):
                 algorithm = algorithms[i]
-                o, o2, r, d, ep_ret, ep_len = steps[i]
+                _, _, _, _, ep_ret, ep_len = steps[i]
                 algorithm.logger.store(EpRet=ep_ret, EpLen=ep_len)
 
-                o, r, d, ep_ret, ep_len = algorithm.env.reset(), 0, False, 0, 0
-                steps[i] = [o, o2, r, d, ep_ret, ep_len]
+            obs = envs.reset()
+            steps = [[obs[i], None, 0, False, 0, 0] for i in range(len(algorithms))]
 
         # End of epoch wrap-up
         if t > 0 and t % steps_per_epoch == 0:
