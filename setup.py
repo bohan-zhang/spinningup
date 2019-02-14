@@ -14,7 +14,7 @@ setup(
     py_modules=['spinup'],
     version=__version__,#'0.1',
     install_requires=[
-        'cloudpickle==0.5.2',
+        'cloudpickle==0.5.5',
         'gym[atari,box2d,classic_control]>=0.10.8',
         'ipython',
         'joblib',
