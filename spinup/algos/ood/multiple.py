@@ -44,6 +44,7 @@ class ReplayBuffer:
 def run_multiple(algorithms, sample_from, replay_buffer, batch_size=100, epochs=100, max_ep_len=1000, start_steps=10000,
                  steps_per_epoch=5000):
     start_time = time.time()
+    steps_per_epoch //= len(sample_from)
     total_steps = steps_per_epoch * epochs
     steps = [[a.env.reset(), None, 0, False, 0, 0] for a in algorithms]  # o, o2, r, d, ep_ret, ep_len
 
@@ -55,7 +56,7 @@ def run_multiple(algorithms, sample_from, replay_buffer, batch_size=100, epochs=
         from a uniform distribution for better exploration. Afterwards, 
         use the learned policy. 
         """
-        for i in range(len(algorithms)):
+        for i in sample_from:
             algorithm = algorithms[i]
             o, o2, r, d, ep_ret, ep_len = steps[i]
 
@@ -75,8 +76,7 @@ def run_multiple(algorithms, sample_from, replay_buffer, batch_size=100, epochs=
             d = False if ep_len == max_ep_len else d
 
             # Store experiences to replay buffer
-            if i in sample_from:
-                replay_buffer.store(o, a, r, o2, d)
+            replay_buffer.store(o, a, r, o2, d)
 
             # Super critical, easy to overlook step: make sure to update
             # most recent observation!
@@ -85,9 +85,13 @@ def run_multiple(algorithms, sample_from, replay_buffer, batch_size=100, epochs=
             if d or ep_len == max_ep_len:
                 for j in range(ep_len):
                     batch = replay_buffer.sample_batch(batch_size)
-                    algorithm.update(batch, j)
 
-                algorithm.logger.store(EpRet=ep_ret, EpLen=ep_len)
+                    for alg in algorithms:
+                        alg.update(batch, j)
+
+                for alg in algorithms:
+                    alg.logger.store(EpRet=ep_ret, EpLen=ep_len)
+
                 o, r, d, ep_ret, ep_len = algorithm.env.reset(), 0, False, 0, 0
 
             # Update steps
@@ -97,7 +101,7 @@ def run_multiple(algorithms, sample_from, replay_buffer, batch_size=100, epochs=
         if t > 0 and t % steps_per_epoch == 0:
             epoch = t // steps_per_epoch
             for algorithm in algorithms:
-                algorithm.wrap_up_epoch(epoch, t, start_time)
+                algorithm.wrap_up_epoch(epoch, t * len(sample_from), start_time)
 
 
 if __name__ == '__main__':
