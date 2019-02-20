@@ -82,31 +82,16 @@ def run_multiple(algorithms, replay_buffer, batch_size=100, epochs=100, max_ep_l
             # most recent observation!
             o = o2
 
-            # Update steps
-            steps[i] = [o, o2, r, d, ep_ret, ep_len]
-
-        done = any(step[3] for step in steps)
-        reached_max_ep_len = any(step[5] == max_ep_len for step in steps)
-
-        if done or reached_max_ep_len:
-            """
-            Perform all SAC updates at the end of the trajectory.
-            This is a slight difference from the SAC specified in the
-            original paper.
-            """
-            for j in range(max(step[5] for step in steps)):
-                batch = replay_buffer.sample_batch(batch_size)
-
-                for algorithm in algorithms:
+            if d or ep_len == max_ep_len:
+                for j in range(ep_len):
+                    batch = replay_buffer.sample_batch(batch_size)
                     algorithm.update(batch, j)
 
-            for i in range(len(algorithms)):
-                algorithm = algorithms[i]
-                o, o2, r, d, ep_ret, ep_len = steps[i]
                 algorithm.logger.store(EpRet=ep_ret, EpLen=ep_len)
-
                 o, r, d, ep_ret, ep_len = algorithm.env.reset(), 0, False, 0, 0
-                steps[i] = [o, o2, r, d, ep_ret, ep_len]
+
+            # Update steps
+            steps[i] = [o, o2, r, d, ep_ret, ep_len]
 
         # End of epoch wrap-up
         if t > 0 and t % steps_per_epoch == 0:
