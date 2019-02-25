@@ -12,7 +12,7 @@ from spinup.algos.ood.td3 import TD3
 
 class ReplayBuffer:
     """
-    A simple FIFO experience replay buffer for SAC agents.
+    A simple FIFO experience replay buffer for agents.
     """
 
     def __init__(self, obs_dim, act_dim, size):
@@ -44,6 +44,7 @@ class ReplayBuffer:
 def run_multiple(algorithms, sample_from, replay_buffer, batch_size=100, epochs=100, max_ep_len=1000, start_steps=10000,
                  steps_per_epoch=5000):
     start_time = time.time()
+    interactions = 0
     steps_per_epoch //= len(sample_from)
     total_steps = steps_per_epoch * epochs
     steps = [[a.env.reset(), None, 0, False, 0, 0] for a in algorithms]  # o, o2, r, d, ep_ret, ep_len
@@ -77,6 +78,7 @@ def run_multiple(algorithms, sample_from, replay_buffer, batch_size=100, epochs=
 
             # Store experiences to replay buffer
             replay_buffer.store(o, a, r, o2, d)
+            interactions += 1
 
             # Super critical, easy to overlook step: make sure to update
             # most recent observation!
@@ -101,7 +103,7 @@ def run_multiple(algorithms, sample_from, replay_buffer, batch_size=100, epochs=
         if t > 0 and t % steps_per_epoch == 0:
             epoch = t // steps_per_epoch
             for algorithm in algorithms:
-                algorithm.wrap_up_epoch(epoch, t * len(sample_from), start_time)
+                algorithm.wrap_up_epoch(epoch, interactions, start_time)
 
 
 if __name__ == '__main__':
