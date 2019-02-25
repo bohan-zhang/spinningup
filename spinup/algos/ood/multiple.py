@@ -117,6 +117,7 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--buffer_size', type=int, default=1e6)
     parser.add_argument('--exp_name', type=str, default='multiple')
     parser.add_argument('--sample_from', type=str, default='', help='0-based index of algorithm to sample action from')
     args = parser.parse_args()
@@ -126,7 +127,7 @@ if __name__ == '__main__':
     rb = ReplayBuffer(
         obs_dim=env.observation_space.shape[0],
         act_dim=env.action_space.shape[0],
-        size=int(1e6)
+        size=int(args.buffer_size)
     )
 
     from spinup.utils.run_utils import setup_logger_kwargs
