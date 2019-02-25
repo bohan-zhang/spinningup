@@ -118,6 +118,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--buffer_size', type=int, default=1e6)
+    parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--exp_name', type=str, default='multiple')
     parser.add_argument('--sample_from', type=str, default='', help='0-based index of algorithm to sample action from')
     args = parser.parse_args()
@@ -170,4 +171,4 @@ if __name__ == '__main__':
         [int(ind) for ind in args.sample_from.split(',') if len(ind) > 0 and int(ind) < len(all_algorithms)]) if len(
         args.sample_from) > 0 else tuple(range(len(all_algorithms)))
 
-    run_multiple(all_algorithms, sf, rb, epochs=args.epochs)
+    run_multiple(all_algorithms, sf, rb, epochs=args.epochs, batch_size=args.batch_size)
