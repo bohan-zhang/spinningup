@@ -4,6 +4,7 @@ import time
 from spinup.algos.ddpg import core
 from spinup.algos.ddpg.core import get_vars
 from spinup.utils.logx import EpochLogger
+from spinup.algos.ood.pairwise_distance import pairwise_distance
 
 
 class ReplayBuffer:
@@ -174,6 +175,10 @@ class DDPG:
         s_a_grads = tf.concat(grads[-2:], axis=1)
         s_a_norm = tf.norm(s_a_grads, axis=1)
 
+        pairwise_q_dist = pairwise_distance(tf.expand_dims(q, 1))
+        pairwise_s_a_dist = pairwise_distance(tf.concat([x_ph, a_ph], axis=1))
+        pairwise_q_sa_ratio = tf.reshape(pairwise_q_dist / (pairwise_s_a_dist + 1e-5), [-1])
+
         # Polyak averaging for target variables
         target_update = tf.group([tf.assign(v_targ, polyak * v_targ + (1 - polyak) * v_main)
                                   for v_main, v_targ in zip(get_vars('%s/main' % name), get_vars('%s/target' % name))])
@@ -211,6 +216,7 @@ class DDPG:
         self.train_q_op = train_q_op
         self.target_update = target_update
         self.s_a_norm = s_a_norm
+        self.pairwise_q_sa_ratio = pairwise_q_sa_ratio
 
     def get_action(self, o, deterministic=False):
         a = self.sess.run(self.pi, feed_dict={self.x_ph: o.reshape(1, -1)})[0]
@@ -236,8 +242,8 @@ class DDPG:
                      }
 
         # Q-learning update
-        outs = self.sess.run([self.q_loss, self.q, self.train_q_op, self.s_a_norm], feed_dict)
-        self.logger.store(LossQ=outs[0], QVals=outs[1], Norm=outs[3])
+        outs = self.sess.run([self.q_loss, self.q, self.train_q_op, self.s_a_norm, self.pairwise_q_sa_ratio], feed_dict)
+        self.logger.store(LossQ=outs[0], QVals=outs[1], Norm=outs[3], QSa=outs[4])
 
         # Policy update
         outs = self.sess.run([self.pi_loss, self.train_pi_op, self.target_update], feed_dict)
@@ -262,5 +268,6 @@ class DDPG:
         self.logger.log_tabular('LossPi', average_only=True)
         self.logger.log_tabular('LossQ', average_only=True)
         self.logger.log_tabular('Norm', with_min_and_max=True)
+        self.logger.log_tabular('QSa', with_min_and_max=True)
         self.logger.log_tabular('Time', time.time() - start_time)
         self.logger.dump_tabular()
