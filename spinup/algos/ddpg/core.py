@@ -3,7 +3,7 @@ import tensorflow as tf
 
 
 def spectral_norm_wrapper(scope=''):
-    def spectral_norm(w, iteration=1):
+    def spectral_norm_fn(w, iteration=1):
         w_shape = w.shape.as_list()
         w = tf.reshape(w, [-1, w_shape[-1]])
 
@@ -34,7 +34,7 @@ def spectral_norm_wrapper(scope=''):
 
         return w_norm
 
-    return spectral_norm
+    return spectral_norm_fn
 
 
 def placeholder(dim=None):
@@ -71,13 +71,14 @@ Actor-Critics
 
 
 def mlp_actor_critic(x, a, hidden_sizes=(400, 300), activation=tf.nn.relu,
-                     output_activation=tf.tanh, action_space=None):
+                     output_activation=tf.tanh, action_space=None, spectral_norm=False):
     act_dim = a.shape.as_list()[-1]
     act_limit = action_space.high[0]
     with tf.variable_scope('pi'):
         pi = act_limit * mlp(x, list(hidden_sizes) + [act_dim], activation, output_activation)
     with tf.variable_scope('q'):
-        q = tf.squeeze(mlp(tf.concat([x, a], axis=-1), list(hidden_sizes) + [1], activation, None, True), axis=1)
+        q = tf.squeeze(mlp(tf.concat([x, a], axis=-1), list(hidden_sizes) + [1], activation, None, spectral_norm),
+                       axis=1)
     with tf.variable_scope('q', reuse=True):
         q_pi = tf.squeeze(mlp(tf.concat([x, pi], axis=-1), list(hidden_sizes) + [1], activation, None), axis=1)
     return pi, q, q_pi
