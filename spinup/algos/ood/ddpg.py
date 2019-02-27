@@ -164,7 +164,15 @@ class DDPG:
         pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
         q_optimizer = tf.train.AdamOptimizer(learning_rate=q_lr)
         train_pi_op = pi_optimizer.minimize(pi_loss, var_list=get_vars('%s/main/pi' % name))
-        train_q_op = q_optimizer.minimize(q_loss, var_list=get_vars('%s/main/q' % name))
+
+        # Calculate gradients for Q function
+        variables = get_vars('%s/main/q' % name) + [x_ph, a_ph]
+        grads = tf.gradients(q_loss, variables)
+        gvs = zip(grads[:-2], variables[:-2])
+        train_q_op = q_optimizer.apply_gradients(gvs)
+
+        s_a_grads = tf.concat(grads[-2:], axis=1)
+        s_a_norm = tf.norm(s_a_grads, axis=1)
 
         # Polyak averaging for target variables
         target_update = tf.group([tf.assign(v_targ, polyak * v_targ + (1 - polyak) * v_main)
@@ -202,6 +210,7 @@ class DDPG:
         self.train_pi_op = train_pi_op
         self.train_q_op = train_q_op
         self.target_update = target_update
+        self.s_a_norm = s_a_norm
 
     def get_action(self, o, deterministic=False):
         a = self.sess.run(self.pi, feed_dict={self.x_ph: o.reshape(1, -1)})[0]
@@ -227,8 +236,8 @@ class DDPG:
                      }
 
         # Q-learning update
-        outs = self.sess.run([self.q_loss, self.q, self.train_q_op], feed_dict)
-        self.logger.store(LossQ=outs[0], QVals=outs[1])
+        outs = self.sess.run([self.q_loss, self.q, self.train_q_op, self.s_a_norm], feed_dict)
+        self.logger.store(LossQ=outs[0], QVals=outs[1], Norm=outs[3])
 
         # Policy update
         outs = self.sess.run([self.pi_loss, self.train_pi_op, self.target_update], feed_dict)
@@ -252,5 +261,6 @@ class DDPG:
         self.logger.log_tabular('QVals', with_min_and_max=True)
         self.logger.log_tabular('LossPi', average_only=True)
         self.logger.log_tabular('LossQ', average_only=True)
+        self.logger.log_tabular('Norm', with_min_and_max=True)
         self.logger.log_tabular('Time', time.time() - start_time)
         self.logger.dump_tabular()
