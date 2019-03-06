@@ -4,6 +4,7 @@ import time
 from spinup.algos.td3 import core
 from spinup.algos.td3.core import get_vars
 from spinup.utils.logx import EpochLogger
+from spinup.algos.ood.pairwise_distance import pairwise_distance
 
 """
 
@@ -156,7 +157,21 @@ class TD3:
         pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
         q_optimizer = tf.train.AdamOptimizer(learning_rate=q_lr)
         train_pi_op = pi_optimizer.minimize(pi_loss, var_list=get_vars('%s/main/pi' % name))
-        train_q_op = q_optimizer.minimize(q_loss, var_list=get_vars('%s/main/q' % name))
+
+        # Calculate gradients for Q function
+        variables = get_vars('%s/main/q' % name) + [x_ph, a_ph]
+        grads = tf.gradients(q_loss, variables)
+        gvs = zip(grads[:-2], variables[:-2])
+        train_q_op = q_optimizer.apply_gradients(gvs)
+
+        s_a_grads = tf.concat(grads[-2:], axis=1)
+        s_a_norm = tf.norm(s_a_grads, axis=1)
+
+        pairwise_q1_dist = pairwise_distance(tf.expand_dims(q1, 1))
+        pairwise_q2_dist = pairwise_distance(tf.expand_dims(q2, 1))
+        pairwise_s_a_dist = pairwise_distance(tf.concat([x_ph, a_ph], axis=1))
+        pairwise_q1_sa_ratio = tf.reshape(pairwise_q1_dist / (pairwise_s_a_dist + 1e-5), [-1])
+        pairwise_q2_sa_ratio = tf.reshape(pairwise_q2_dist / (pairwise_s_a_dist + 1e-5), [-1])
 
         # Polyak averaging for target variables
         target_update = tf.group([tf.assign(v_targ, polyak * v_targ + (1 - polyak) * v_main)
@@ -193,6 +208,9 @@ class TD3:
         self.pi_loss, self.q_loss = pi_loss, q_loss
         self.train_pi_op, self.train_q_op = train_pi_op, train_q_op
         self.target_update = target_update
+        self.s_a_norm = s_a_norm
+        self.pairwise_q1_sa_ratio = pairwise_q1_sa_ratio
+        self.pairwise_q2_sa_ratio = pairwise_q2_sa_ratio
 
     def get_action(self, o, deterministic=False):
         a = self.sess.run(self.pi, feed_dict={self.x_ph: o.reshape(1, -1)})[0]
@@ -216,9 +234,10 @@ class TD3:
                      self.r_ph: batch['rews'],
                      self.d_ph: batch['done']
                      }
-        q_step_ops = [self.q_loss, self.q1, self.q2, self.train_q_op]
+        q_step_ops = [self.q_loss, self.q1, self.q2, self.train_q_op, self.s_a_norm, self.pairwise_q1_sa_ratio,
+                      self.pairwise_q2_sa_ratio]
         outs = self.sess.run(q_step_ops, feed_dict)
-        self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2])
+        self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[3], Q1Sa=outs[4], Q2Sa=outs[5])
 
         if step % self.policy_delay == 0:
             # Delayed policy update
@@ -244,5 +263,8 @@ class TD3:
         self.logger.log_tabular('Q2Vals', with_min_and_max=True)
         self.logger.log_tabular('LossPi', average_only=True)
         self.logger.log_tabular('LossQ', average_only=True)
+        self.logger.log_tabular('Norm', with_min_and_max=True)
+        self.logger.log_tabular('Q1Sa', with_min_and_max=True)
+        self.logger.log_tabular('Q2Sa', with_min_and_max=True)
         self.logger.log_tabular('Time', time.time() - start_time)
         self.logger.dump_tabular()
