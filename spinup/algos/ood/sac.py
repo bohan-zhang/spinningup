@@ -4,6 +4,7 @@ import time
 from spinup.algos.sac import core
 from spinup.algos.sac.core import get_vars
 from spinup.utils.logx import EpochLogger
+from spinup.algos.ood.pairwise_distance import pairwise_distance
 
 """
 
@@ -158,7 +159,21 @@ class SAC:
         value_optimizer = tf.train.AdamOptimizer(learning_rate=lr)
         value_params = get_vars('%s/main/q' % name) + get_vars('%s/main/v' % name)
         with tf.control_dependencies([train_pi_op]):
-            train_value_op = value_optimizer.minimize(value_loss, var_list=value_params)
+            # train_value_op = value_optimizer.minimize(value_loss, var_list=value_params)
+            # Calculate gradients for Q function
+            variables = get_vars('%s/main/q' % name) + [x_ph, a_ph]
+            grads = tf.gradients(value_loss, variables)
+            gvs = zip(grads[:-2], variables[:-2])
+            train_value_op = value_optimizer.apply_gradients(gvs)
+
+            s_a_grads = tf.concat(grads[-2:], axis=1)
+            s_a_norm = tf.norm(s_a_grads, axis=1)
+
+            pairwise_q1_dist = pairwise_distance(tf.expand_dims(q1, 1))
+            pairwise_q2_dist = pairwise_distance(tf.expand_dims(q2, 1))
+            pairwise_s_a_dist = pairwise_distance(tf.concat([x_ph, a_ph], axis=1))
+            pairwise_q1_sa_ratio = tf.reshape(pairwise_q1_dist / (pairwise_s_a_dist + 1e-5), [-1])
+            pairwise_q2_sa_ratio = tf.reshape(pairwise_q2_dist / (pairwise_s_a_dist + 1e-5), [-1])
 
         # Polyak averaging for target variables
         # (control flow because sess.run otherwise evaluates in nondeterministic order)
@@ -199,6 +214,9 @@ class SAC:
         self.mu, self.pi, self.logp_pi = mu, pi, logp_pi
         self.q1, self.q2, self.q1_pi, self.q2_pi, v = q1, q2, q1_pi, q2_pi, v
         self.step_ops = step_ops
+        self.s_a_norm = s_a_norm
+        self.pairwise_q1_sa_ratio = pairwise_q1_sa_ratio
+        self.pairwise_q2_sa_ratio = pairwise_q2_sa_ratio
 
     def get_action(self, o, deterministic=False):
         act_op = self.mu if deterministic else self.pi
@@ -223,7 +241,8 @@ class SAC:
                      self.d_ph: batch['done'],
                      }
 
-        outs = self.sess.run(self.step_ops, feed_dict)
+        outs = self.sess.run(self.step_ops + [self.s_a_norm, self.pairwise_q1_sa_ratio, self.pairwise_q2_sa_ratio],
+                             feed_dict)
         self.logger.store(
             LossPi=outs[0],
             LossQ1=outs[1],
@@ -232,7 +251,10 @@ class SAC:
             Q1Vals=outs[4],
             Q2Vals=outs[5],
             VVals=outs[6],
-            LogPi=outs[7]
+            LogPi=outs[7],
+            Norm=outs[11],
+            Q1Sa=outs[12],
+            Q2Sa=outs[13]
         )
 
     def wrap_up_epoch(self, epoch, t, start_time):
@@ -258,5 +280,8 @@ class SAC:
         self.logger.log_tabular('LossQ1', average_only=True)
         self.logger.log_tabular('LossQ2', average_only=True)
         self.logger.log_tabular('LossV', average_only=True)
+        self.logger.log_tabular('Norm', with_min_and_max=True)
+        self.logger.log_tabular('Q1Sa', with_min_and_max=True)
+        self.logger.log_tabular('Q2Sa', with_min_and_max=True)
         self.logger.log_tabular('Time', time.time() - start_time)
         self.logger.dump_tabular()

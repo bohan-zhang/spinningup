@@ -237,7 +237,7 @@ class TD3:
         q_step_ops = [self.q_loss, self.q1, self.q2, self.train_q_op, self.s_a_norm, self.pairwise_q1_sa_ratio,
                       self.pairwise_q2_sa_ratio]
         outs = self.sess.run(q_step_ops, feed_dict)
-        self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[3], Q1Sa=outs[4], Q2Sa=outs[5])
+        self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], Q1Sa=outs[5], Q2Sa=outs[6])
 
         if step % self.policy_delay == 0:
             # Delayed policy update
