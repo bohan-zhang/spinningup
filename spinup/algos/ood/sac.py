@@ -173,6 +173,7 @@ class SAC:
 
             s_a_grads = tf.concat(grads[-2:], axis=1)
             s_a_norm = tf.norm(s_a_grads, axis=1)
+            a_norm = tf.norm(grads[-1], axis=1)
 
             pairwise_q1_dist = pairwise_distance(tf.expand_dims(q1, 1))
             pairwise_q2_dist = pairwise_distance(tf.expand_dims(q2, 1))
@@ -220,6 +221,7 @@ class SAC:
         self.q1, self.q2, self.q1_pi, self.q2_pi, v = q1, q2, q1_pi, q2_pi, v
         self.step_ops = step_ops
         self.s_a_norm = s_a_norm
+        self.a_norm = a_norm
         self.pairwise_q1_sa_ratio = pairwise_q1_sa_ratio
         self.pairwise_q2_sa_ratio = pairwise_q2_sa_ratio
 
@@ -246,8 +248,9 @@ class SAC:
                      self.d_ph: batch['done'],
                      }
 
-        outs = self.sess.run(self.step_ops + [self.s_a_norm, self.pairwise_q1_sa_ratio, self.pairwise_q2_sa_ratio],
-                             feed_dict)
+        outs = self.sess.run(
+            self.step_ops + [self.s_a_norm, self.a_norm, self.pairwise_q1_sa_ratio, self.pairwise_q2_sa_ratio],
+            feed_dict)
         self.logger.store(
             LossPi=outs[0],
             LossQ1=outs[1],
@@ -258,12 +261,13 @@ class SAC:
             VVals=outs[6],
             LogPi=outs[7],
             Norm=outs[11],
-            Q1Sa=outs[12],
-            Q2Sa=outs[13]
+            ANorm=outs[12],
+            Q1Sa=outs[13],
+            Q2Sa=outs[14]
         )
 
     def get_batch_update_ops(self, step):
-        ops = self.step_ops + [self.s_a_norm, self.pairwise_q1_sa_ratio, self.pairwise_q2_sa_ratio]
+        ops = self.step_ops + [self.s_a_norm, self.a_norm, self.pairwise_q1_sa_ratio, self.pairwise_q2_sa_ratio]
         callback = lambda outs: self.logger.store(
             LossPi=outs[0],
             LossQ1=outs[1],
@@ -274,8 +278,9 @@ class SAC:
             VVals=outs[6],
             LogPi=outs[7],
             Norm=outs[11],
-            Q1Sa=outs[12],
-            Q2Sa=outs[13]
+            ANorm=outs[12],
+            Q1Sa=outs[13],
+            Q2Sa=outs[14]
         )
 
         return ops, callback
@@ -304,6 +309,7 @@ class SAC:
         self.logger.log_tabular('LossQ2', average_only=True)
         self.logger.log_tabular('LossV', average_only=True)
         self.logger.log_tabular('Norm', with_min_and_max=True)
+        self.logger.log_tabular('ANorm', with_min_and_max=True)
         self.logger.log_tabular('Q1Sa', with_min_and_max=True)
         self.logger.log_tabular('Q2Sa', with_min_and_max=True)
         self.logger.log_tabular('Time', time.time() - start_time)

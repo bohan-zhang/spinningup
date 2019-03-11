@@ -170,6 +170,7 @@ class TD3:
 
         s_a_grads = tf.concat(grads[-2:], axis=1)
         s_a_norm = tf.norm(s_a_grads, axis=1)
+        a_norm = tf.norm(grads[-1], axis=1)
 
         pairwise_q1_dist = pairwise_distance(tf.expand_dims(q1, 1))
         pairwise_q2_dist = pairwise_distance(tf.expand_dims(q2, 1))
@@ -213,6 +214,7 @@ class TD3:
         self.train_pi_op, self.train_q_op = train_pi_op, train_q_op
         self.target_update = target_update
         self.s_a_norm = s_a_norm
+        self.a_norm = a_norm
         self.pairwise_q1_sa_ratio = pairwise_q1_sa_ratio
         self.pairwise_q2_sa_ratio = pairwise_q2_sa_ratio
 
@@ -238,27 +240,29 @@ class TD3:
                      self.r_ph: batch['rews'],
                      self.d_ph: batch['done']
                      }
-        q_step_ops = [self.q_loss, self.q1, self.q2, self.train_q_op, self.s_a_norm, self.pairwise_q1_sa_ratio,
-                      self.pairwise_q2_sa_ratio]
+        q_step_ops = [self.q_loss, self.q1, self.q2, self.train_q_op, self.s_a_norm, self.a_norm,
+                      self.pairwise_q1_sa_ratio, self.pairwise_q2_sa_ratio]
         if step % self.policy_delay == 0:
             outs = self.sess.run(q_step_ops + [self.pi_loss, self.train_pi_op, self.target_update], feed_dict)
-            self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], Q1Sa=outs[5],
-                              Q2Sa=outs[6], LossPi=outs[len(q_step_ops)])
+            self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], ANorm=outs[5], Q1Sa=outs[6],
+                              Q2Sa=outs[7], LossPi=outs[len(q_step_ops)])
         else:
             outs = self.sess.run(q_step_ops, feed_dict)
-            self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], Q1Sa=outs[5], Q2Sa=outs[6])
+            self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], ANorm=outs[5], Q1Sa=outs[6],
+                              Q2Sa=outs[7])
 
     def get_batch_update_ops(self, step):
-        q_step_ops = [self.q_loss, self.q1, self.q2, self.train_q_op, self.s_a_norm, self.pairwise_q1_sa_ratio,
-                      self.pairwise_q2_sa_ratio]
+        q_step_ops = [self.q_loss, self.q1, self.q2, self.train_q_op, self.s_a_norm, self.a_norm,
+                      self.pairwise_q1_sa_ratio, self.pairwise_q2_sa_ratio]
         if step % self.policy_delay:
             ops = q_step_ops + [self.pi_loss, self.train_pi_op, self.target_update]
             callback = lambda outs: self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4],
-                                                      Q1Sa=outs[5], Q2Sa=outs[6], LossPi=outs[len(q_step_ops)])
+                                                      ANorm=outs[5], Q1Sa=outs[6], Q2Sa=outs[7],
+                                                      LossPi=outs[len(q_step_ops)])
         else:
             ops = q_step_ops
             callback = lambda outs: self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4],
-                                                      Q1Sa=outs[5], Q2Sa=outs[6])
+                                                      ANorm=outs[5], Q1Sa=outs[6], Q2Sa=outs[7])
 
         return ops, callback
 
@@ -282,6 +286,7 @@ class TD3:
         self.logger.log_tabular('LossPi', average_only=True)
         self.logger.log_tabular('LossQ', average_only=True)
         self.logger.log_tabular('Norm', with_min_and_max=True)
+        self.logger.log_tabular('ANorm', with_min_and_max=True)
         self.logger.log_tabular('Q1Sa', with_min_and_max=True)
         self.logger.log_tabular('Q2Sa', with_min_and_max=True)
         self.logger.log_tabular('Time', time.time() - start_time)

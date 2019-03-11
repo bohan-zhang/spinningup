@@ -178,6 +178,7 @@ class DDPG:
 
         s_a_grads = tf.concat(grads[-2:], axis=1)
         s_a_norm = tf.norm(s_a_grads, axis=1)
+        a_norm = tf.norm(grads[-1], axis=1)
 
         pairwise_q_dist = pairwise_distance(tf.expand_dims(q, 1))
         pairwise_s_a_dist = pairwise_distance(tf.concat([x_ph, a_ph], axis=1))
@@ -220,6 +221,7 @@ class DDPG:
         self.train_q_op = train_q_op
         self.target_update = target_update
         self.s_a_norm = s_a_norm
+        self.a_norm = a_norm
         self.pairwise_q_sa_ratio = pairwise_q_sa_ratio
 
     def get_action(self, o, deterministic=False):
@@ -246,16 +248,17 @@ class DDPG:
                      }
 
         # Q-learning update
-        q_update_ops = [self.q_loss, self.q, self.train_q_op, self.s_a_norm, self.pairwise_q_sa_ratio]
+        q_update_ops = [self.q_loss, self.q, self.train_q_op, self.s_a_norm, self.a_norm, self.pairwise_q_sa_ratio]
         update_ops = q_update_ops + [self.pi_loss, self.train_pi_op, self.target_update]
         outs = self.sess.run(update_ops, feed_dict)
-        self.logger.store(LossQ=outs[0], QVals=outs[1], Norm=outs[3], QSa=outs[4], LossPi=outs[len(q_update_ops)])
+        self.logger.store(LossQ=outs[0], QVals=outs[1], Norm=outs[3], ANorm=outs[4], QSa=outs[5],
+                          LossPi=outs[len(q_update_ops)])
 
     def get_batch_update_ops(self, step):
         q_update_ops = [self.q_loss, self.q, self.train_q_op, self.s_a_norm, self.pairwise_q_sa_ratio]
         ops = q_update_ops + [self.pi_loss, self.train_pi_op, self.target_update]
-        callback = lambda outs: self.logger.store(LossQ=outs[0], QVals=outs[1], Norm=outs[3], QSa=outs[4],
-                                                  LossPi=outs[len(q_update_ops)])
+        callback = lambda outs: self.logger.store(LossQ=outs[0], QVals=outs[1], Norm=outs[3], ANorm=outs[4],
+                                                  QSa=outs[5], LossPi=outs[len(q_update_ops)])
 
         return ops, callback
 
@@ -278,6 +281,7 @@ class DDPG:
         self.logger.log_tabular('LossPi', average_only=True)
         self.logger.log_tabular('LossQ', average_only=True)
         self.logger.log_tabular('Norm', with_min_and_max=True)
+        self.logger.log_tabular('ANorm', with_min_and_max=True)
         self.logger.log_tabular('QSa', with_min_and_max=True)
         self.logger.log_tabular('Time', time.time() - start_time)
         self.logger.dump_tabular()
