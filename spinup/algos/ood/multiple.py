@@ -1,7 +1,9 @@
 import numpy as np
 import tensorflow as tf
 import gym
+from itertools import chain
 import time
+import sys
 from spinup.algos.sac import core as sac_core
 from spinup.algos.ddpg import core as ddpg_core
 from spinup.algos.td3 import core as td3_core
@@ -85,25 +87,35 @@ def run_multiple(algorithms, sample_from, replay_buffer, batch_size=100, epochs=
             o = o2
 
             if d or ep_len == max_ep_len:
-                for j in range(ep_len):
-                    batch = replay_buffer.sample_batch(batch_size)
-
-                    for alg in algorithms:
-                        alg.update(batch, j)
-
-                for alg in algorithms:
-                    alg.logger.store(EpRet=ep_ret, EpLen=ep_len)
-
+                algorithm.logger.store(EpRet=ep_ret, EpLen=ep_len)
                 o, r, d, ep_ret, ep_len = algorithm.env.reset(), 0, False, 0, 0
 
             # Update steps
             steps[i] = [o, o2, r, d, ep_ret, ep_len]
+
+        batch = replay_buffer.sample_batch(batch_size)
+
+        algorithm = algorithms[0]
+        feed_dict = {algorithm.x_ph: batch['obs1'],
+                     algorithm.x2_ph: batch['obs2'],
+                     algorithm.a_ph: batch['acts'],
+                     algorithm.r_ph: batch['rews'],
+                     algorithm.d_ph: batch['done']
+                     }
+        update_ops, callbacks = zip(*[a.get_batch_update_ops(t) for a in algorithms])
+
+        outs = algorithm.sess.run(list(chain.from_iterable(update_ops)), feed_dict)
+
+        lens = np.cumsum([0] + [len(o) for o in update_ops])
+        for i, (start, end) in enumerate(zip(lens[:-1], lens[1:])):
+            callbacks[i](outs[start:end])
 
         # End of epoch wrap-up
         if t > 0 and t % steps_per_epoch == 0:
             epoch = t // steps_per_epoch
             for algorithm in algorithms:
                 algorithm.wrap_up_epoch(epoch, interactions, start_time)
+                sys.stdout.flush()
 
 
 if __name__ == '__main__':
@@ -136,6 +148,10 @@ if __name__ == '__main__':
     from spinup.utils.run_utils import setup_logger_kwargs
 
     all_algorithms = []
+    obs_dim = env.observation_space.shape[0]
+    act_dim = env.action_space.shape[0]
+    phs = sac_core.placeholders(obs_dim, act_dim, obs_dim, None, None)
+
     for k, algo in enumerate(args.algorithms.split(',')):
         algorithm_name = '%s-%s-%d-%s' % (args.exp_name, args.env, k, algo)
         logger_kwargs = setup_logger_kwargs(algorithm_name, args.seed)
@@ -145,28 +161,28 @@ if __name__ == '__main__':
                 SAC(session, rb, lambda: gym.make(args.env), actor_critic=sac_core.mlp_actor_critic,
                     ac_kwargs=dict(hidden_sizes=[args.hid] * args.l),
                     gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-                    logger_kwargs=logger_kwargs, name=algorithm_name)
+                    logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs)
             )
         elif algo == 'sac_zero_alpha':
             all_algorithms.append(
                 SAC(session, rb, lambda: gym.make(args.env), actor_critic=sac_core.mlp_actor_critic,
                     ac_kwargs=dict(hidden_sizes=[args.hid] * args.l),
                     gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-                    logger_kwargs=logger_kwargs, name=algorithm_name, alpha=0.0)
+                    logger_kwargs=logger_kwargs, name=algorithm_name, alpha=0.0, phs=phs)
             )
         elif algo == 'ddpg':
             all_algorithms.append(
                 DDPG(session, rb, lambda: gym.make(args.env), actor_critic=ddpg_core.mlp_actor_critic,
                      ac_kwargs=dict(hidden_sizes=[args.hid] * args.l, spectral_norm=args.spectral_norm),
                      gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-                     logger_kwargs=logger_kwargs, name=algorithm_name)
+                     logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs)
             )
         elif algo == 'td3':
             all_algorithms.append(
                 TD3(session, rb, lambda: gym.make(args.env), actor_critic=td3_core.mlp_actor_critic,
                     ac_kwargs=dict(hidden_sizes=[args.hid] * args.l),
                     gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-                    logger_kwargs=logger_kwargs, name=algorithm_name)
+                    logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs)
             )
 
     sf = tuple(

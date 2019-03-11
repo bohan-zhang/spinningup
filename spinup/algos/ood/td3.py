@@ -17,7 +17,7 @@ class TD3:
     def __init__(self, sess, replay_buffer, env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                  steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, polyak=0.995, pi_lr=1e-3,
                  q_lr=1e-3, batch_size=100, start_steps=10000, act_noise=0.1, target_noise=0.2, noise_clip=0.5,
-                 policy_delay=2, max_ep_len=1000, logger_kwargs=dict(), save_freq=1, name='td3'):
+                 policy_delay=2, max_ep_len=1000, logger_kwargs=dict(), save_freq=1, name='td3', phs=None):
         """
 
         Args:
@@ -100,6 +100,7 @@ class TD3:
 
         params = locals()
         params.pop('sess')
+        params.pop('phs')
         logger = EpochLogger(**logger_kwargs)
         logger.save_config(params)
 
@@ -117,7 +118,10 @@ class TD3:
         ac_kwargs['action_space'] = env.action_space
 
         # Inputs to computation graph
-        x_ph, a_ph, x2_ph, r_ph, d_ph = core.placeholders(obs_dim, act_dim, obs_dim, None, None)
+        if phs:
+          x_ph, a_ph, x2_ph, r_ph, d_ph = phs
+        else:
+          x_ph, a_ph, x2_ph, r_ph, d_ph = core.placeholders(obs_dim, act_dim, obs_dim, None, None)
 
         # Main outputs from computation graph
         with tf.variable_scope('%s/main' % name):
@@ -235,14 +239,28 @@ class TD3:
                      self.d_ph: batch['done']
                      }
         q_step_ops = [self.q_loss, self.q1, self.q2, self.train_q_op, self.s_a_norm, self.pairwise_q1_sa_ratio,
-                      self.pairwise_q2_sa_ratio]
-        outs = self.sess.run(q_step_ops, feed_dict)
-        self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], Q1Sa=outs[5], Q2Sa=outs[6])
-
+                    self.pairwise_q2_sa_ratio]
         if step % self.policy_delay == 0:
-            # Delayed policy update
-            outs = self.sess.run([self.pi_loss, self.train_pi_op, self.target_update], feed_dict)
-            self.logger.store(LossPi=outs[0])
+          outs = self.sess.run(q_step_ops + [self.pi_loss, self.train_pi_op, self.target_update], feed_dict)
+          self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], Q1Sa=outs[5], 
+            Q2Sa=outs[6],LossPi=outs[len(q_step_ops)])
+        else:
+          outs = self.sess.run(q_step_ops, feed_dict)
+          self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], Q1Sa=outs[5], Q2Sa=outs[6])
+    
+    def get_batch_update_ops(self, step):
+      q_step_ops = [self.q_loss, self.q1, self.q2, self.train_q_op, self.s_a_norm, self.pairwise_q1_sa_ratio,
+                    self.pairwise_q2_sa_ratio]
+      if step % self.policy_delay:
+        ops = q_step_ops + [self.pi_loss, self.train_pi_op, self.target_update]
+        callback = lambda outs: self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], Q1Sa=outs[5], 
+            Q2Sa=outs[6],LossPi=outs[len(q_step_ops)])
+      else:
+        ops = q_step_ops
+        callback = lambda outs: self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], Q1Sa=outs[5], 
+            Q2Sa=outs[6]) 
+
+      return ops, callback
 
     def wrap_up_epoch(self, epoch, t, start_time):
         # Save model

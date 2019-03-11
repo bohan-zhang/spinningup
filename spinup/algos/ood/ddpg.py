@@ -49,7 +49,7 @@ class DDPG:
     def __init__(self, sess, replay_buffer, env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                  steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, polyak=0.995, pi_lr=1e-3,
                  q_lr=1e-3, batch_size=100, start_steps=10000, act_noise=0.1, max_ep_len=1000, logger_kwargs=dict(),
-                 save_freq=1, name='ddpg'):
+                 save_freq=1, name='ddpg', phs=None):
         """
 
         Args:
@@ -120,6 +120,7 @@ class DDPG:
 
         params = locals()
         params.pop('sess')
+        params.pop('phs')
         logger = EpochLogger(**logger_kwargs)
         logger.save_config(params)
 
@@ -137,7 +138,10 @@ class DDPG:
         ac_kwargs['action_space'] = env.action_space
 
         # Inputs to computation graph
-        x_ph, a_ph, x2_ph, r_ph, d_ph = core.placeholders(obs_dim, act_dim, obs_dim, None, None)
+        if phs:
+          x_ph, a_ph, x2_ph, r_ph, d_ph = phs
+        else:
+          x_ph, a_ph, x2_ph, r_ph, d_ph = core.placeholders(obs_dim, act_dim, obs_dim, None, None)
 
         # Main outputs from computation graph
         with tf.variable_scope('%s/main' % name):
@@ -242,12 +246,18 @@ class DDPG:
                      }
 
         # Q-learning update
-        outs = self.sess.run([self.q_loss, self.q, self.train_q_op, self.s_a_norm, self.pairwise_q_sa_ratio], feed_dict)
-        self.logger.store(LossQ=outs[0], QVals=outs[1], Norm=outs[3], QSa=outs[4])
+        q_update_ops = [self.q_loss, self.q, self.train_q_op, self.s_a_norm, self.pairwise_q_sa_ratio]
+        update_ops = q_update_ops + [self.pi_loss, self.train_pi_op, self.target_update]
+        outs = self.sess.run(update_ops, feed_dict)
+        self.logger.store(LossQ=outs[0], QVals=outs[1], Norm=outs[3], QSa=outs[4], LossPi=outs[len(q_update_ops)])
 
-        # Policy update
-        outs = self.sess.run([self.pi_loss, self.train_pi_op, self.target_update], feed_dict)
-        self.logger.store(LossPi=outs[0])
+    def get_batch_update_ops(self, step):
+      q_update_ops = [self.q_loss, self.q, self.train_q_op, self.s_a_norm, self.pairwise_q_sa_ratio]
+      ops = q_update_ops + [self.pi_loss, self.train_pi_op, self.target_update]
+      callback = lambda outs:  self.logger.store(LossQ=outs[0], QVals=outs[1], Norm=outs[3], QSa=outs[4], 
+        LossPi=outs[len(q_update_ops)])
+
+      return ops, callback
 
     def wrap_up_epoch(self, epoch, t, start_time):
         # Save model

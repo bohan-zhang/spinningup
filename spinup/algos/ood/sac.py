@@ -18,7 +18,8 @@ Soft Actor-Critic
 class SAC:
     def __init__(self, sess, replay_buffer, env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                  steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, polyak=0.995, lr=1e-3, alpha=0.2,
-                 batch_size=100, start_steps=10000, max_ep_len=1000, logger_kwargs=dict(), save_freq=1, name='sac'):
+                 batch_size=100, start_steps=10000, max_ep_len=1000, logger_kwargs=dict(), save_freq=1, name='sac',
+                 phs=None):
         """
 
         Args:
@@ -102,6 +103,7 @@ class SAC:
 
         params = locals()
         params.pop('sess')
+        params.pop('phs')
         logger = EpochLogger(**logger_kwargs)
         logger.save_config(params)
 
@@ -119,7 +121,10 @@ class SAC:
         ac_kwargs['action_space'] = env.action_space
 
         # Inputs to computation graph
-        x_ph, a_ph, x2_ph, r_ph, d_ph = core.placeholders(obs_dim, act_dim, obs_dim, None, None)
+        if phs:
+            x_ph, a_ph, x2_ph, r_ph, d_ph = phs
+        else:
+            x_ph, a_ph, x2_ph, r_ph, d_ph = core.placeholders(obs_dim, act_dim, obs_dim, None, None)
 
         # Main outputs from computation graph
         with tf.variable_scope('%s/main' % name):
@@ -256,6 +261,24 @@ class SAC:
             Q1Sa=outs[12],
             Q2Sa=outs[13]
         )
+
+    def get_batch_update_ops(self, step):
+        ops = self.step_ops + [self.s_a_norm, self.pairwise_q1_sa_ratio, self.pairwise_q2_sa_ratio]
+        callback = lambda outs: self.logger.store(
+            LossPi=outs[0],
+            LossQ1=outs[1],
+            LossQ2=outs[2],
+            LossV=outs[3],
+            Q1Vals=outs[4],
+            Q2Vals=outs[5],
+            VVals=outs[6],
+            LogPi=outs[7],
+            Norm=outs[11],
+            Q1Sa=outs[12],
+            Q2Sa=outs[13]
+        )
+
+        return ops, callback
 
     def wrap_up_epoch(self, epoch, t, start_time):
         # Save model
