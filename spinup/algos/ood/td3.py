@@ -119,9 +119,9 @@ class TD3:
 
         # Inputs to computation graph
         if phs:
-          x_ph, a_ph, x2_ph, r_ph, d_ph = phs
+            x_ph, a_ph, x2_ph, r_ph, d_ph = phs
         else:
-          x_ph, a_ph, x2_ph, r_ph, d_ph = core.placeholders(obs_dim, act_dim, obs_dim, None, None)
+            x_ph, a_ph, x2_ph, r_ph, d_ph = core.placeholders(obs_dim, act_dim, obs_dim, None, None)
 
         # Main outputs from computation graph
         with tf.variable_scope('%s/main' % name):
@@ -239,28 +239,28 @@ class TD3:
                      self.d_ph: batch['done']
                      }
         q_step_ops = [self.q_loss, self.q1, self.q2, self.train_q_op, self.s_a_norm, self.pairwise_q1_sa_ratio,
-                    self.pairwise_q2_sa_ratio]
+                      self.pairwise_q2_sa_ratio]
         if step % self.policy_delay == 0:
-          outs = self.sess.run(q_step_ops + [self.pi_loss, self.train_pi_op, self.target_update], feed_dict)
-          self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], Q1Sa=outs[5], 
-            Q2Sa=outs[6],LossPi=outs[len(q_step_ops)])
+            outs = self.sess.run(q_step_ops + [self.pi_loss, self.train_pi_op, self.target_update], feed_dict)
+            self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], Q1Sa=outs[5],
+                              Q2Sa=outs[6], LossPi=outs[len(q_step_ops)])
         else:
-          outs = self.sess.run(q_step_ops, feed_dict)
-          self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], Q1Sa=outs[5], Q2Sa=outs[6])
-    
-    def get_batch_update_ops(self, step):
-      q_step_ops = [self.q_loss, self.q1, self.q2, self.train_q_op, self.s_a_norm, self.pairwise_q1_sa_ratio,
-                    self.pairwise_q2_sa_ratio]
-      if step % self.policy_delay:
-        ops = q_step_ops + [self.pi_loss, self.train_pi_op, self.target_update]
-        callback = lambda outs: self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], Q1Sa=outs[5], 
-            Q2Sa=outs[6],LossPi=outs[len(q_step_ops)])
-      else:
-        ops = q_step_ops
-        callback = lambda outs: self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], Q1Sa=outs[5], 
-            Q2Sa=outs[6]) 
+            outs = self.sess.run(q_step_ops, feed_dict)
+            self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4], Q1Sa=outs[5], Q2Sa=outs[6])
 
-      return ops, callback
+    def get_batch_update_ops(self, step):
+        q_step_ops = [self.q_loss, self.q1, self.q2, self.train_q_op, self.s_a_norm, self.pairwise_q1_sa_ratio,
+                      self.pairwise_q2_sa_ratio]
+        if step % self.policy_delay:
+            ops = q_step_ops + [self.pi_loss, self.train_pi_op, self.target_update]
+            callback = lambda outs: self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4],
+                                                      Q1Sa=outs[5], Q2Sa=outs[6], LossPi=outs[len(q_step_ops)])
+        else:
+            ops = q_step_ops
+            callback = lambda outs: self.logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2], Norm=outs[4],
+                                                      Q1Sa=outs[5], Q2Sa=outs[6])
+
+        return ops, callback
 
     def wrap_up_epoch(self, epoch, t, start_time):
         # Save model

@@ -139,9 +139,9 @@ class DDPG:
 
         # Inputs to computation graph
         if phs:
-          x_ph, a_ph, x2_ph, r_ph, d_ph = phs
+            x_ph, a_ph, x2_ph, r_ph, d_ph = phs
         else:
-          x_ph, a_ph, x2_ph, r_ph, d_ph = core.placeholders(obs_dim, act_dim, obs_dim, None, None)
+            x_ph, a_ph, x2_ph, r_ph, d_ph = core.placeholders(obs_dim, act_dim, obs_dim, None, None)
 
         # Main outputs from computation graph
         with tf.variable_scope('%s/main' % name):
@@ -252,12 +252,12 @@ class DDPG:
         self.logger.store(LossQ=outs[0], QVals=outs[1], Norm=outs[3], QSa=outs[4], LossPi=outs[len(q_update_ops)])
 
     def get_batch_update_ops(self, step):
-      q_update_ops = [self.q_loss, self.q, self.train_q_op, self.s_a_norm, self.pairwise_q_sa_ratio]
-      ops = q_update_ops + [self.pi_loss, self.train_pi_op, self.target_update]
-      callback = lambda outs:  self.logger.store(LossQ=outs[0], QVals=outs[1], Norm=outs[3], QSa=outs[4], 
-        LossPi=outs[len(q_update_ops)])
+        q_update_ops = [self.q_loss, self.q, self.train_q_op, self.s_a_norm, self.pairwise_q_sa_ratio]
+        ops = q_update_ops + [self.pi_loss, self.train_pi_op, self.target_update]
+        callback = lambda outs: self.logger.store(LossQ=outs[0], QVals=outs[1], Norm=outs[3], QSa=outs[4],
+                                                  LossPi=outs[len(q_update_ops)])
 
-      return ops, callback
+        return ops, callback
 
     def wrap_up_epoch(self, epoch, t, start_time):
         # Save model
