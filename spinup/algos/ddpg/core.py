@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 
 
-def spectral_norm_wrapper(scope=''):
+def spectral_norm_wrapper(scope='', sn=1.0):
     def spectral_norm_fn(w, iteration=1):
         w_shape = w.shape.as_list()
         w = tf.reshape(w, [-1, w_shape[-1]])
@@ -29,7 +29,7 @@ def spectral_norm_wrapper(scope=''):
         sigma = tf.matmul(tf.matmul(v_hat, w), tf.transpose(u_hat))
 
         with tf.control_dependencies([u.assign(u_hat)]):
-            w_norm = w / sigma
+            w_norm = w / (sigma * sn)
             w_norm = tf.reshape(w_norm, w_shape)
 
         return w_norm
@@ -45,15 +45,18 @@ def placeholders(*args):
     return [placeholder(dim) for dim in args]
 
 
-def mlp(x, hidden_sizes=(32,), activation=tf.tanh, output_activation=None, sn=False):
+def mlp(x, hidden_sizes=(32,), activation=tf.tanh, output_activation=None, sn=0.0, reg=0.0):
     scope, i = tf.get_variable_scope().name, 0
     for h in hidden_sizes[:-1]:
-        kc = spectral_norm_wrapper('%s/%d' % (scope, i)) if sn else None
-        x = tf.layers.dense(x, units=h, activation=activation, kernel_constraint=kc)
+        kc = spectral_norm_wrapper('%s/%d' % (scope, i), sn) if sn > 0 else None
+        kr = tf.contrib.layers.l2_regularizer(scale=reg) if reg > 0 else None
+        x = tf.layers.dense(x, units=h, activation=activation, kernel_constraint=kc, kernel_regularizer=kr)
         i += 1
 
-    last_sn = spectral_norm_wrapper('%s/%d' % (scope, i)) if sn else None
-    return tf.layers.dense(x, units=hidden_sizes[-1], activation=output_activation, kernel_constraint=last_sn)
+    last_sn = spectral_norm_wrapper('%s/%d' % (scope, i), sn) if sn > 0 else None
+    last_reg = tf.contrib.layers.l2_regularizer(scale=reg) if reg > 0 else None
+    return tf.layers.dense(x, units=hidden_sizes[-1], activation=output_activation, kernel_constraint=last_sn,
+                           kernel_regularizer=last_reg)
 
 
 def get_vars(scope):
@@ -71,14 +74,13 @@ Actor-Critics
 
 
 def mlp_actor_critic(x, a, hidden_sizes=(400, 300), activation=tf.nn.relu,
-                     output_activation=tf.tanh, action_space=None, spectral_norm=False):
+                     output_activation=tf.tanh, action_space=None, sn=0.0, reg=0.0):
     act_dim = a.shape.as_list()[-1]
     act_limit = action_space.high[0]
     with tf.variable_scope('pi'):
         pi = act_limit * mlp(x, list(hidden_sizes) + [act_dim], activation, output_activation)
     with tf.variable_scope('q'):
-        q = tf.squeeze(mlp(tf.concat([x, a], axis=-1), list(hidden_sizes) + [1], activation, None, spectral_norm),
-                       axis=1)
+        q = tf.squeeze(mlp(tf.concat([x, a], axis=-1), list(hidden_sizes) + [1], activation, None, sn, reg), axis=1)
     with tf.variable_scope('q', reuse=True):
         q_pi = tf.squeeze(mlp(tf.concat([x, pi], axis=-1), list(hidden_sizes) + [1], activation, None), axis=1)
     return pi, q, q_pi

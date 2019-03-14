@@ -133,7 +133,8 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--exp_name', type=str, default='multiple')
     parser.add_argument('--sample_from', type=str, default='', help='0-based index of algorithm to sample action from')
-    parser.add_argument('--spectral_norm', dest='spectral_norm', action='store_true')
+    parser.add_argument('--spectral_norm', type=float, default=0.0)
+    parser.add_argument('--regularizer', type=float, default=0.0)
     parser.set_defaults(spectral_norm=False)
     args = parser.parse_args()
 
@@ -173,7 +174,7 @@ if __name__ == '__main__':
         elif algo == 'ddpg':
             all_algorithms.append(
                 DDPG(session, rb, lambda: gym.make(args.env), actor_critic=ddpg_core.mlp_actor_critic,
-                     ac_kwargs=dict(hidden_sizes=[args.hid] * args.l, spectral_norm=args.spectral_norm),
+                     ac_kwargs=dict(hidden_sizes=[args.hid] * args.l, sn=args.spectral_norm, reg=args.regularizer),
                      gamma=args.gamma, seed=args.seed, epochs=args.epochs,
                      logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs)
             )
