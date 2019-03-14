@@ -29,7 +29,7 @@ def spectral_norm_wrapper(scope='', sn=1.0):
         sigma = tf.matmul(tf.matmul(v_hat, w), tf.transpose(u_hat))
 
         with tf.control_dependencies([u.assign(u_hat)]):
-            w_norm = w / (sigma * sn)
+            w_norm = w / sigma * sn
             w_norm = tf.reshape(w_norm, w_shape)
 
         return w_norm
