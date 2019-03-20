@@ -2,8 +2,8 @@ import numpy as np
 import tensorflow as tf
 
 
-def spectral_norm_wrapper(scope='', sn=1.0):
-    def spectral_norm_fn(w, iteration=1):
+def spectral_norm_wrapper(scope='', sn=1.0, iteration=1):
+    def spectral_norm_fn(w):
         w_shape = w.shape.as_list()
         w = tf.reshape(w, [-1, w_shape[-1]])
 
@@ -37,8 +37,8 @@ def spectral_norm_wrapper(scope='', sn=1.0):
     return spectral_norm_fn
 
 
-def spectral_reg_wrapper(scope='', reg=0.0):
-    def spectral_reg_fn(w, iteration=1):
+def spectral_reg_wrapper(scope='', reg=0.0, iteration=1):
+    def spectral_reg_fn(w):
         w_shape = w.shape.as_list()
         print(w_shape)
 
