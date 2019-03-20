@@ -162,8 +162,9 @@ class DDPG:
         backup = tf.stop_gradient(r_ph + gamma * (1 - d_ph) * q_pi_targ)
 
         # DDPG losses
+        reg_loss = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
         pi_loss = -tf.reduce_mean(q_pi)
-        q_loss = tf.reduce_mean((q - backup) ** 2)
+        q_loss = tf.reduce_mean((q - backup) ** 2) + sum(reg_loss)
 
         # Separate train ops for pi, q
         pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
