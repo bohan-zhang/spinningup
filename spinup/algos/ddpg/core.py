@@ -40,20 +40,19 @@ def spectral_norm_wrapper(scope='', sn=1.0, iteration=1):
 def spectral_reg_wrapper(scope='', reg=0.0, iteration=1):
     def spectral_reg_fn(w):
         w_shape = w.shape.as_list()
-        print(w_shape)
-
+        u = None
         v = tf.get_variable('%s/v' % scope, [w_shape[-1], 1], initializer=tf.random_normal_initializer(),
                             trainable=False)
 
-        sigma = None
         for i in range(iteration):
             u = tf.matmul(w, v)
             v = tf.matmul(tf.transpose(w), u)
-            sigma = tf.nn.l2_loss(u) / tf.nn.l2_loss(v)
 
-        loss = tf.stop_gradient(sigma) * reg
+        u_ = tf.stop_gradient(u)
+        v_ = tf.stop_gradient(v)
+        sigma = tf.nn.l2_loss(u_) / tf.nn.l2_loss(v_)
 
-        return loss
+        return sigma * reg
 
     return spectral_reg_fn
 
