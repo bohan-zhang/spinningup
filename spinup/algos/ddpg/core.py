@@ -63,7 +63,7 @@ def spectral_norm_reg_wrapper(scope='', reg=0.0, iteration=1):
 
         sigma = tf.matmul(tf.matmul(v_hat, w), tf.transpose(u_hat))
 
-        return sigma ** 2 * reg
+        return tf.stop_gradient(tf.square(sigma)) * reg
 
     return spectral_reg_fn
 
