@@ -37,6 +37,37 @@ def spectral_norm_wrapper(scope='', sn=1.0, iteration=1):
     return spectral_norm_fn
 
 
+def spectral_norm_reg_wrapper(scope='', reg=0.0, iteration=1):
+    def spectral_reg_fn(w):
+        w_shape = w.shape.as_list()
+        w = tf.reshape(w, [-1, w_shape[-1]])
+
+        u = tf.get_variable('%s/u' % scope, [1, w_shape[-1]], initializer=tf.random_normal_initializer(),
+                            trainable=False)
+
+        u_hat = u
+        v_hat = None
+        for i in range(iteration):
+            """
+            power iteration
+            Usually iteration = 1 will be enough
+            """
+            v_ = tf.matmul(u_hat, tf.transpose(w))
+            v_hat = tf.nn.l2_normalize(v_)
+
+            u_ = tf.matmul(v_hat, w)
+            u_hat = tf.nn.l2_normalize(u_)
+
+        u_hat = tf.stop_gradient(u_hat)
+        v_hat = tf.stop_gradient(v_hat)
+
+        sigma = tf.matmul(tf.matmul(v_hat, w), tf.transpose(u_hat))
+
+        return sigma ** 2 * reg
+
+    return spectral_reg_fn
+
+
 def spectral_reg_wrapper(scope='', reg=0.0, iteration=1):
     def spectral_reg_fn(w):
         w_shape = w.shape.as_list()
@@ -68,13 +99,13 @@ def placeholders(*args):
 def mlp(x, hidden_sizes=(32,), activation=tf.tanh, output_activation=None, sn=0.0, reg=0.0):
     scope, i = tf.get_variable_scope().name, 0
     for h in hidden_sizes[:-1]:
-        kc = spectral_norm_wrapper('%s/%d' % (scope, i), sn) if sn > 0 else None
-        kr = spectral_reg_wrapper('%s/%d' % (scope, i), reg) if reg > 0 else None
+        kc = spectral_norm_wrapper('%s/%d_norm' % (scope, i), sn) if sn > 0 else None
+        kr = spectral_norm_reg_wrapper('%s/%d_reg' % (scope, i), reg) if reg > 0 else None
         x = tf.layers.dense(x, units=h, activation=activation, kernel_constraint=kc, kernel_regularizer=kr)
         i += 1
 
-    last_sn = spectral_norm_wrapper('%s/%d' % (scope, i), sn) if sn > 0 else None
-    last_reg = spectral_reg_wrapper('%s/%d' % (scope, i), reg) if reg > 0 else None
+    last_sn = spectral_norm_wrapper('%s/%d_norm' % (scope, i), sn) if sn > 0 else None
+    last_reg = spectral_norm_reg_wrapper('%s/%d_reg' % (scope, i), reg) if reg > 0 else None
     return tf.layers.dense(x, units=hidden_sizes[-1], activation=output_activation, kernel_constraint=last_sn,
                            kernel_regularizer=last_reg)
 
