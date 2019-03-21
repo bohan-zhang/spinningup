@@ -169,7 +169,7 @@ class SAC:
             variables = get_vars('%s/main/q' % name) + [x_ph, a_ph]
             grads = tf.gradients(value_loss, variables)
             gvs = zip(grads[:-2], variables[:-2])
-            train_value_op = value_optimizer.apply_gradients(gvs)
+            train_value_op = value_optimizer.minimize(value_loss, var_list=value_params)
 
             s_a_grads = tf.concat(grads[-2:], axis=1)
             s_a_norm = tf.norm(s_a_grads, axis=1)
