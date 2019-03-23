@@ -162,8 +162,9 @@ class DDPG:
         backup = tf.stop_gradient(r_ph + gamma * (1 - d_ph) * q_pi_targ)
 
         # DDPG losses
+        reg_loss = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
         pi_loss = -tf.reduce_mean(q_pi)
-        q_loss = tf.reduce_mean((q - backup) ** 2)
+        q_loss = tf.reduce_mean((q - backup) ** 2) + sum(reg_loss)
 
         # Separate train ops for pi, q
         pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
@@ -174,7 +175,7 @@ class DDPG:
         variables = get_vars('%s/main/q' % name) + [x_ph, a_ph]
         grads = tf.gradients(q_loss, variables)
         gvs = zip(grads[:-2], variables[:-2])
-        train_q_op = q_optimizer.apply_gradients(gvs)
+        train_q_op = q_optimizer.minimize(q_loss, var_list=get_vars('%s/main/q' % name))
 
         s_a_grads = tf.concat(grads[-2:], axis=1)
         s_a_norm = tf.norm(s_a_grads, axis=1)

@@ -136,6 +136,7 @@ if __name__ == '__main__':
     parser.add_argument('--spectral_norm', type=float, default=0.0)
     parser.add_argument('--regularizer', type=float, default=0.0)
     parser.add_argument('--no_gpu', type=bool, default=False)
+    parser.add_argument('--max_ep_len', type=int, default=1e3)
     parser.set_defaults(spectral_norm=False)
     args = parser.parse_args()
 
@@ -160,7 +161,7 @@ if __name__ == '__main__':
     phs = sac_core.placeholders(obs_dim, act_dim, obs_dim, None, None)
 
     for k, algo in enumerate(args.algorithms.split(',')):
-        algorithm_name = '%s-%s-%d-%s' % (args.exp_name, args.env, k, algo)
+        algorithm_name = '%s-%s-%s' % (args.exp_name, args.env, algo)
         logger_kwargs = setup_logger_kwargs(algorithm_name, args.seed)
 
         if algo == 'sac':
@@ -196,4 +197,4 @@ if __name__ == '__main__':
         [int(ind) for ind in args.sample_from.split(',') if len(ind) > 0 and int(ind) < len(all_algorithms)]) if len(
         args.sample_from) > 0 else tuple(range(len(all_algorithms)))
 
-    run_multiple(all_algorithms, sf, rb, epochs=args.epochs, batch_size=args.batch_size)
+    run_multiple(all_algorithms, sf, rb, epochs=args.epochs, batch_size=args.batch_size, max_ep_len=args.max_ep_len)

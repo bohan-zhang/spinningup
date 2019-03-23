@@ -2,8 +2,8 @@ import numpy as np
 import tensorflow as tf
 
 
-def spectral_norm_wrapper(scope='', sn=1.0):
-    def spectral_norm_fn(w, iteration=1):
+def spectral_norm_wrapper(scope='', sn=1.0, iteration=1):
+    def spectral_norm_fn(w):
         w_shape = w.shape.as_list()
         w = tf.reshape(w, [-1, w_shape[-1]])
 
@@ -37,6 +37,57 @@ def spectral_norm_wrapper(scope='', sn=1.0):
     return spectral_norm_fn
 
 
+def spectral_norm_reg_wrapper(scope='', reg=0.0, iteration=1):
+    def spectral_reg_fn(w):
+        w_shape = w.shape.as_list()
+        w = tf.reshape(w, [-1, w_shape[-1]])
+
+        u = tf.get_variable('%s/u' % scope, [1, w_shape[-1]], initializer=tf.random_normal_initializer(),
+                            trainable=False)
+
+        u_hat = u
+        v_hat = None
+        for i in range(iteration):
+            """
+            power iteration
+            Usually iteration = 1 will be enough
+            """
+            v_ = tf.matmul(u_hat, tf.transpose(w))
+            v_hat = tf.nn.l2_normalize(v_)
+
+            u_ = tf.matmul(v_hat, w)
+            u_hat = tf.nn.l2_normalize(u_)
+
+        u_hat = tf.stop_gradient(u_hat)
+        v_hat = tf.stop_gradient(v_hat)
+
+        sigma = tf.matmul(tf.matmul(v_hat, w), tf.transpose(u_hat))
+
+        return tf.stop_gradient(tf.square(sigma)) * reg
+
+    return spectral_reg_fn
+
+
+def spectral_reg_wrapper(scope='', reg=0.0, iteration=1):
+    def spectral_reg_fn(w):
+        w_shape = w.shape.as_list()
+        u = None
+        v = tf.get_variable('%s/v' % scope, [w_shape[-1], 1], initializer=tf.random_normal_initializer(),
+                            trainable=False)
+
+        for i in range(iteration):
+            u = tf.matmul(w, v)
+            v = tf.matmul(tf.transpose(w), u)
+
+        u_ = tf.stop_gradient(u)
+        v_ = tf.stop_gradient(v)
+        sigma = tf.nn.l2_loss(u_) / tf.nn.l2_loss(v_)
+
+        return sigma * reg
+
+    return spectral_reg_fn
+
+
 def placeholder(dim=None):
     return tf.placeholder(dtype=tf.float32, shape=(None, dim) if dim else (None,))
 
@@ -48,13 +99,13 @@ def placeholders(*args):
 def mlp(x, hidden_sizes=(32,), activation=tf.tanh, output_activation=None, sn=0.0, reg=0.0):
     scope, i = tf.get_variable_scope().name, 0
     for h in hidden_sizes[:-1]:
-        kc = spectral_norm_wrapper('%s/%d' % (scope, i), sn) if sn > 0 else None
-        kr = tf.contrib.layers.l2_regularizer(scale=reg) if reg > 0 else None
+        kc = spectral_norm_wrapper('%s/%d_norm' % (scope, i), sn) if sn > 0 else None
+        kr = spectral_norm_reg_wrapper('%s/%d_reg' % (scope, i), reg) if reg > 0 else None
         x = tf.layers.dense(x, units=h, activation=activation, kernel_constraint=kc, kernel_regularizer=kr)
         i += 1
 
-    last_sn = spectral_norm_wrapper('%s/%d' % (scope, i), sn) if sn > 0 else None
-    last_reg = tf.contrib.layers.l2_regularizer(scale=reg) if reg > 0 else None
+    last_sn = spectral_norm_wrapper('%s/%d_norm' % (scope, i), sn) if sn > 0 else None
+    last_reg = spectral_norm_reg_wrapper('%s/%d_reg' % (scope, i), reg) if reg > 0 else None
     return tf.layers.dense(x, units=hidden_sizes[-1], activation=output_activation, kernel_constraint=last_sn,
                            kernel_regularizer=last_reg)
 

@@ -166,7 +166,7 @@ class TD3:
         variables = get_vars('%s/main/q' % name) + [x_ph, a_ph]
         grads = tf.gradients(q_loss, variables)
         gvs = zip(grads[:-2], variables[:-2])
-        train_q_op = q_optimizer.apply_gradients(gvs)
+        train_q_op = q_optimizer.minimize(q_loss, var_list=get_vars('%s/main/q' % name))
 
         s_a_grads = tf.concat(grads[-2:], axis=1)
         s_a_norm = tf.norm(s_a_grads, axis=1)
