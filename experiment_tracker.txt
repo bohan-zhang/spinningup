@@ -1,0 +1,43 @@
+source ~/.bashrc
+export PYTHONPATH=/scratch/gobi1/spitis/spinningup/
+cd /scratch/gobi1/spitis/spinningup/
+
+python spinup/algos/ood/multiple.py ddpg --exp_name=reg1e-3 --env=Walker2d-v2 --epochs=500 --spectral_norm=0. --regularizer=1e-3 --seed=111
+python spinup/algos/ood/multiple.py ddpg --exp_name=reg1e-3 --env=Walker2d-v2 --epochs=500 --spectral_norm=0. --regularizer=1e-3 --seed=222
+python spinup/algos/ood/multiple.py ddpg --exp_name=reg1e-3 --env=Walker2d-v2 --epochs=500 --spectral_norm=0. --regularizer=1e-3 --seed=333
+
+
+python spinup/algos/ood/multiple.py ddpg --exp_name=reg1e-2 --env=Walker2d-v2 --epochs=500 --spectral_norm=0. --regularizer=1e-2 --seed=111
+python spinup/algos/ood/multiple.py ddpg --exp_name=reg1e-2 --env=Walker2d-v2 --epochs=500 --spectral_norm=0. --regularizer=1e-2 --seed=222
+python spinup/algos/ood/multiple.py ddpg --exp_name=reg1e-2 --env=Walker2d-v2 --epochs=500 --spectral_norm=0. --regularizer=1e-2 --seed=333
+
+
+srun --gres=gpu:1 -c 12 --mem=14G -p wsgpu -u parallel --lb python spinup/algos/ood/multiple.py ddpg --exp_name=reg1e-1 --env=Walker2d-v2 --epochs=500 --spectral_norm=0. --regularizer=1e-1 --seed={} ::: 111 222 333
+srun --gres=gpu:1 -c 12 --mem=14G -p wsgpu -u parallel --lb python spinup/algos/ood/multiple.py ddpg --exp_name=reg1.0 --env=Walker2d-v2 --epochs=500 --spectral_norm=0. --regularizer=1.0 --seed={} ::: 111 222 333
+srun --gres=gpu:1 -c 12 --mem=14G -p wsgpu -u parallel --lb python spinup/algos/ood/multiple.py ddpg --exp_name=baseline --env=Walker2d-v2 --epochs=500 --spectral_norm=0. --regularizer=0. --seed={} ::: 111 222 333
+
+source activate tfcpu
+
+
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py ddpg --exp_name=sn50 --env=Walker2d-v2 --epochs=1000 --spectral_norm=50. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py ddpg --exp_name=sn10 --env=Walker2d-v2 --epochs=1000 --spectral_norm=10. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py ddpg --exp_name=sn1 --env=Walker2d-v2 --epochs=1000 --spectral_norm=1. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py ddpg --exp_name=sn300 --env=Walker2d-v2 --epochs=1000 --spectral_norm=300. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py ddpg --exp_name=sn100 --env=Walker2d-v2 --epochs=1000 --spectral_norm=100. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py ddpg --exp_name=baseline --env=Walker2d-v2 --epochs=1000 --spectral_norm=0. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py td3 --exp_name=baseline --env=Walker2d-v2 --epochs=1000 --spectral_norm=0. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py sac --exp_name=baseline --env=Walker2d-v2 --epochs=1000 --spectral_norm=0. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+
+
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py ddpg --exp_name=baseline --env=Ant-v2 --epochs=1000 --spectral_norm=0. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py td3 --exp_name=baseline --env=Ant-v2 --epochs=1000 --spectral_norm=0. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py sac --exp_name=baseline --env=Ant-v2 --epochs=1000 --spectral_norm=0. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+
+
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py ddpg --exp_name=baseline --env=HalfCheetah-v2 --epochs=1000 --spectral_norm=0. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py td3 --exp_name=baseline --env=HalfCheetah-v2 --epochs=1000 --spectral_norm=0. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py sac --exp_name=baseline --env=HalfCheetah-v2 --epochs=1000 --spectral_norm=0. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py ddpg --exp_name=baseline --env=Hopper-v2 --epochs=1000 --spectral_norm=0. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py td3 --exp_name=baseline --env=Hopper-v2 --epochs=1000 --spectral_norm=0. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555
+srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py sac --exp_name=baseline --env=Hopper-v2 --epochs=1000 --spectral_norm=0. --regularizer=0. --no_gpu=True --seed={} ::: 111 222 333 444 555

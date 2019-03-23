@@ -135,11 +135,17 @@ if __name__ == '__main__':
     parser.add_argument('--sample_from', type=str, default='', help='0-based index of algorithm to sample action from')
     parser.add_argument('--spectral_norm', type=float, default=0.0)
     parser.add_argument('--regularizer', type=float, default=0.0)
+    parser.add_argument('--no_gpu', type=bool, default=False)
     parser.add_argument('--max_ep_len', type=int, default=1e3)
     parser.set_defaults(spectral_norm=False)
     args = parser.parse_args()
 
-    session = tf.Session()
+    if args.no_gpu:
+      session = tf.Session()
+    else:
+      config = tf.ConfigProto()
+      config.gpu_options.allow_growth = True
+      session = tf.Session(config=config)
     env = gym.make(args.env)
     rb = ReplayBuffer(
         obs_dim=env.observation_space.shape[0],
