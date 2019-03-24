@@ -22,7 +22,7 @@ class DoubleHillEnv(gym.Env):
         else:
             reward = 0.0
 
-        return np.array([0]), reward, False, {}
+        return np.array([0]), reward, True, {}
 
     def reset(self):
         return np.array([0])

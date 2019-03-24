@@ -81,3 +81,18 @@ srun -c 10 --mem=30G -p cpu -u parallel --lb python spinup/algos/ood/multiple.py
 
 
 **
+
+
+python spinup/envs/multiple.py ddpg --exp_name=dh1_baseline --regularizer=0. --no_gpu=True
+python spinup/envs/multiple.py ddpg --exp_name=dh1_1e-1 --regularizer=1e-1 --no_gpu=True
+python spinup/envs/multiple.py ddpg --exp_name=dh1_1e-2 --regularizer=1e-2 --no_gpu=True
+
+python spinup/envs/multiple.py sac --exp_name=dh1sac --no_gpu=True
+python spinup/envs/multiple.py sac_alpha --exp_name=dh1sac_0.1 --no_gpu=True --alpha=0.1
+
+python spinup/envs/multiple.py ddpg --exp_name=dz1_baseline --env=DoubleZigZag --regularizer=0. --no_gpu=True
+python spinup/envs/multiple.py ddpg --exp_name=dz1_1e-1 --env=DoubleZigZag --regularizer=1e-1 --no_gpu=True
+python spinup/envs/multiple.py ddpg --exp_name=dz1_1e-2 --env=DoubleZigZag --regularizer=1e-2 --no_gpu=True
+
+python spinup/envs/multiple.py sac --exp_name=dz1sac --env=DoubleZigZag --no_gpu=True
+python spinup/envs/multiple.py sac_alpha --exp_name=dz1sac_0.1 --env=DoubleZigZag --no_gpu=True --alpha=0.1

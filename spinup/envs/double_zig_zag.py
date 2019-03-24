@@ -18,11 +18,11 @@ class DoubleZigZag(gym.Env):
         if -1.0 <= x < 0.0:
             reward = x + 1
         elif 0.0 <= x < 1.0:
-            reward = x
+            reward = x - 0.5
         else:
             reward = 0.0
 
-        return np.array([0]), reward, False, {}
+        return np.array([0]), reward, True, {}
 
     def reset(self):
         return np.array([0])

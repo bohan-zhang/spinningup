@@ -133,7 +133,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('algorithms', type=str)
     parser.add_argument('--env', type=str, default='DoubleHill')
-    parser.add_argument('--hid', type=int, default=300)
+    parser.add_argument('--hid', type=int, default=100)
     parser.add_argument('--l', type=int, default=1)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
@@ -144,11 +144,18 @@ if __name__ == '__main__':
     parser.add_argument('--sample_from', type=str, default='', help='0-based index of algorithm to sample action from')
     parser.add_argument('--spectral_norm', type=float, default=0.0)
     parser.add_argument('--regularizer', type=float, default=0.0)
-    parser.add_argument('--max_ep_len', type=int, default=100)
+    parser.add_argument('--alpha', type=float, default=0.0)
+    parser.add_argument('--no_gpu', type=bool, default=False)
+    parser.add_argument('--max_ep_len', type=int, default=50)
     parser.set_defaults(spectral_norm=False)
     args = parser.parse_args()
 
-    session = tf.Session()
+    if args.no_gpu:
+      session = tf.Session()
+    else:
+      config = tf.ConfigProto()
+      config.gpu_options.allow_growth = True
+      session = tf.Session(config=config)
     env = make_env(args.env)
     rb = ReplayBuffer(
         obs_dim=env.observation_space.shape[0],
@@ -174,12 +181,12 @@ if __name__ == '__main__':
                     gamma=args.gamma, seed=args.seed, epochs=args.epochs,
                     logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs)
             )
-        elif algo == 'sac_zero_alpha':
+        elif algo == 'sac_alpha':
             all_algorithms.append(
                 SAC(session, rb, lambda: make_env(args.env), actor_critic=sac_core.mlp_actor_critic,
                     ac_kwargs=dict(hidden_sizes=[args.hid] * args.l),
                     gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-                    logger_kwargs=logger_kwargs, name=algorithm_name, alpha=0.0, phs=phs)
+                    logger_kwargs=logger_kwargs, name=algorithm_name, alpha=args.alpha, phs=phs)
             )
         elif algo == 'ddpg':
             all_algorithms.append(
