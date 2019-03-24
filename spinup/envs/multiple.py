@@ -134,7 +134,7 @@ if __name__ == '__main__':
     parser.add_argument('algorithms', type=str)
     parser.add_argument('--env', type=str, default='DoubleHill')
     parser.add_argument('--hid', type=int, default=100)
-    parser.add_argument('--l', type=int, default=1)
+    parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=50)
@@ -146,6 +146,7 @@ if __name__ == '__main__':
     parser.add_argument('--regularizer', type=float, default=0.0)
     parser.add_argument('--alpha', type=float, default=0.0)
     parser.add_argument('--no_gpu', type=bool, default=False)
+    parser.add_argument('--activation', type=str, default='relu')
     parser.add_argument('--max_ep_len', type=int, default=50)
     parser.set_defaults(spectral_norm=False)
     args = parser.parse_args()
@@ -170,6 +171,13 @@ if __name__ == '__main__':
     act_dim = env.action_space.shape[0]
     phs = sac_core.placeholders(obs_dim, act_dim, obs_dim, None, None)
 
+    if args.activation == 'relu':
+      act = tf.nn.relu
+    elif args.activation == 'tanh':
+      act = tf.nn.tanh
+    else:
+      raise NotImplementedError
+
     for k, algo in enumerate(args.algorithms.split(',')):
         algorithm_name = '%s-%s-%s' % (args.exp_name, args.env, algo)
         logger_kwargs = setup_logger_kwargs(algorithm_name, args.seed)
@@ -177,21 +185,21 @@ if __name__ == '__main__':
         if algo == 'sac':
             all_algorithms.append(
                 SAC(session, rb, lambda: make_env(args.env), actor_critic=sac_core.mlp_actor_critic,
-                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l),
+                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l, activation=act),
                     gamma=args.gamma, seed=args.seed, epochs=args.epochs,
                     logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs)
             )
         elif algo == 'sac_alpha':
             all_algorithms.append(
                 SAC(session, rb, lambda: make_env(args.env), actor_critic=sac_core.mlp_actor_critic,
-                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l),
+                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l, activation=act),
                     gamma=args.gamma, seed=args.seed, epochs=args.epochs,
                     logger_kwargs=logger_kwargs, name=algorithm_name, alpha=args.alpha, phs=phs)
             )
         elif algo == 'ddpg':
             all_algorithms.append(
                 DDPG(session, rb, lambda: make_env(args.env), actor_critic=ddpg_core.mlp_actor_critic,
-                     ac_kwargs=dict(hidden_sizes=[args.hid] * args.l, sn=args.spectral_norm, reg=args.regularizer),
+                     ac_kwargs=dict(hidden_sizes=[args.hid] * args.l, activation=act, sn=args.spectral_norm, reg=args.regularizer),
                      gamma=args.gamma, seed=args.seed, epochs=args.epochs,
                      logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs)
             )
