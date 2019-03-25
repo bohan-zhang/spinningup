@@ -147,16 +147,17 @@ if __name__ == '__main__':
     parser.add_argument('--alpha', type=float, default=0.0)
     parser.add_argument('--no_gpu', type=bool, default=False)
     parser.add_argument('--activation', type=str, default='relu')
-    parser.add_argument('--max_ep_len', type=int, default=50)
+    parser.add_argument('--max_ep_len', type=int, default=1)
     parser.set_defaults(spectral_norm=False)
     args = parser.parse_args()
 
     if args.no_gpu:
-      session = tf.Session()
+        session = tf.Session()
     else:
-      config = tf.ConfigProto()
-      config.gpu_options.allow_growth = True
-      session = tf.Session(config=config)
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        session = tf.Session(config=config)
+
     env = make_env(args.env)
     rb = ReplayBuffer(
         obs_dim=env.observation_space.shape[0],
@@ -172,11 +173,11 @@ if __name__ == '__main__':
     phs = sac_core.placeholders(obs_dim, act_dim, obs_dim, None, None)
 
     if args.activation == 'relu':
-      act = tf.nn.relu
+        act = tf.nn.relu
     elif args.activation == 'tanh':
-      act = tf.nn.tanh
+        act = tf.nn.tanh
     else:
-      raise NotImplementedError
+        raise NotImplementedError
 
     for k, algo in enumerate(args.algorithms.split(',')):
         algorithm_name = '%s-%s-%s' % (args.exp_name, args.env, algo)
@@ -185,30 +186,30 @@ if __name__ == '__main__':
         if algo == 'sac':
             all_algorithms.append(
                 SAC(session, rb, lambda: make_env(args.env), actor_critic=sac_core.mlp_actor_critic,
-                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l, activation=act),
-                    gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-                    logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs)
+                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l, activation=act), gamma=args.gamma, seed=args.seed,
+                    epochs=args.epochs, logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs,
+                    max_ep_len=args.max_ep_len)
             )
         elif algo == 'sac_alpha':
             all_algorithms.append(
                 SAC(session, rb, lambda: make_env(args.env), actor_critic=sac_core.mlp_actor_critic,
-                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l, activation=act),
-                    gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-                    logger_kwargs=logger_kwargs, name=algorithm_name, alpha=args.alpha, phs=phs)
+                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l, activation=act), gamma=args.gamma, seed=args.seed,
+                    epochs=args.epochs, logger_kwargs=logger_kwargs, name=algorithm_name, alpha=args.alpha, phs=phs,
+                    max_ep_len=args.max_ep_len)
             )
         elif algo == 'ddpg':
             all_algorithms.append(
                 DDPG(session, rb, lambda: make_env(args.env), actor_critic=ddpg_core.mlp_actor_critic,
-                     ac_kwargs=dict(hidden_sizes=[args.hid] * args.l, activation=act, sn=args.spectral_norm, reg=args.regularizer),
-                     gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-                     logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs)
+                     ac_kwargs=dict(hidden_sizes=[args.hid] * args.l, activation=act, sn=args.spectral_norm,
+                                    reg=args.regularizer), gamma=args.gamma, seed=args.seed, epochs=args.epochs,
+                     logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs, max_ep_len=args.max_ep_len)
             )
         elif algo == 'td3':
             all_algorithms.append(
                 TD3(session, rb, lambda: make_env(args.env), actor_critic=td3_core.mlp_actor_critic,
-                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l),
-                    gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-                    logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs)
+                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), gamma=args.gamma, seed=args.seed,
+                    epochs=args.epochs, logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs,
+                    max_ep_len=args.max_ep_len)
             )
 
     sf = tuple(

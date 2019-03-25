@@ -141,11 +141,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.no_gpu:
-      session = tf.Session()
+        session = tf.Session()
     else:
-      config = tf.ConfigProto()
-      config.gpu_options.allow_growth = True
-      session = tf.Session(config=config)
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        session = tf.Session(config=config)
+
     env = gym.make(args.env)
     rb = ReplayBuffer(
         obs_dim=env.observation_space.shape[0],
@@ -167,14 +168,14 @@ if __name__ == '__main__':
         if algo == 'sac':
             all_algorithms.append(
                 SAC(session, rb, lambda: gym.make(args.env), actor_critic=sac_core.mlp_actor_critic,
-                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l),
+                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), max_ep_len=args.max_ep_len,
                     gamma=args.gamma, seed=args.seed, epochs=args.epochs,
                     logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs)
             )
         elif algo == 'sac_zero_alpha':
             all_algorithms.append(
                 SAC(session, rb, lambda: gym.make(args.env), actor_critic=sac_core.mlp_actor_critic,
-                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l),
+                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), max_ep_len=args.max_ep_len,
                     gamma=args.gamma, seed=args.seed, epochs=args.epochs,
                     logger_kwargs=logger_kwargs, name=algorithm_name, alpha=0.0, phs=phs)
             )
@@ -182,13 +183,13 @@ if __name__ == '__main__':
             all_algorithms.append(
                 DDPG(session, rb, lambda: gym.make(args.env), actor_critic=ddpg_core.mlp_actor_critic,
                      ac_kwargs=dict(hidden_sizes=[args.hid] * args.l, sn=args.spectral_norm, reg=args.regularizer),
-                     gamma=args.gamma, seed=args.seed, epochs=args.epochs,
+                     gamma=args.gamma, seed=args.seed, epochs=args.epochs, max_ep_len=args.max_ep_len,
                      logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs)
             )
         elif algo == 'td3':
             all_algorithms.append(
                 TD3(session, rb, lambda: gym.make(args.env), actor_critic=td3_core.mlp_actor_critic,
-                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l),
+                    ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), max_ep_len=args.max_ep_len,
                     gamma=args.gamma, seed=args.seed, epochs=args.epochs,
                     logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs)
             )
