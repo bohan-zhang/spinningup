@@ -146,6 +146,7 @@ if __name__ == '__main__':
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         session = tf.Session(config=config)
+
     env = gym.make(args.env)
     rb = ReplayBuffer(
         obs_dim=env.observation_space.shape[0],
