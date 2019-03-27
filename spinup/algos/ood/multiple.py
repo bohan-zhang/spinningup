@@ -7,7 +7,7 @@ import sys
 from spinup.algos.sac import core as sac_core
 from spinup.algos.ddpg import core as ddpg_core
 from spinup.algos.td3 import core as td3_core
-from spinup.algos.ood import std3_core as std3_core
+from spinup.algos.std3 import core as std3_core
 from spinup.algos.ood.sac import SAC
 from spinup.algos.ood.ddpg import DDPG
 from spinup.algos.ood.td3 import TD3

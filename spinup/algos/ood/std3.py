@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import time
-from spinup.algos.ood import std3_core as core
+from spinup.algos.std3 import core as core
 from spinup.algos.td3.core import get_vars
 from spinup.utils.logx import EpochLogger
 from spinup.algos.ood.pairwise_distance import pairwise_distance
