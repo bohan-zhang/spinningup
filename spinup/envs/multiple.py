@@ -12,7 +12,7 @@ from spinup.algos.ood.ddpg import DDPG
 from spinup.algos.ood.td3 import TD3
 from spinup.algos.ood.std3 import STD3
 from spinup.envs.double_hill import DoubleHillEnv
-from spinup.envs.double_zig_zag import DoubleZigZag
+from spinup.envs import DoubleHillEnv, DoubleZigZag, SlantedRidge
 
 
 class ReplayBuffer:
@@ -47,7 +47,7 @@ class ReplayBuffer:
 
 
 def run_multiple(algorithms, sample_from, replay_buffer, batch_size=100, epochs=100, max_ep_len=1000, start_steps=1000,
-                 steps_per_epoch=200):
+                 steps_per_epoch=40):
     start_time = time.time()
     interactions = 0
     steps_per_epoch //= len(sample_from)
@@ -126,6 +126,8 @@ def make_env(env_name):
         return DoubleHillEnv()
     elif env_name == 'DoubleZigZag':
         return DoubleZigZag()
+    elif env_name == 'SlantedRidge':
+        return SlantedRidge()
     return DoubleHillEnv()
 
 
@@ -135,11 +137,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('algorithms', type=str)
     parser.add_argument('--env', type=str, default='DoubleHill')
-    parser.add_argument('--hid', type=int, default=100)
+    parser.add_argument('--hid', type=int, default=200)
     parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--epochs', type=int, default=50)
+    parser.add_argument('--epochs', type=int, default=1000)
     parser.add_argument('--buffer_size', type=int, default=1e6)
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--exp_name', type=str, default='multiple')
@@ -149,12 +151,15 @@ if __name__ == '__main__':
     parser.add_argument('--alpha', type=float, default=0.0)
     parser.add_argument('--no_gpu', type=bool, default=False)
     parser.add_argument('--activation', type=str, default='relu')
-    parser.add_argument('--max_ep_len', type=int, default=1)
+    parser.add_argument('--max_ep_len', type=int, default=20)
     parser.set_defaults(spectral_norm=False)
     args = parser.parse_args()
 
     if args.no_gpu:
-        session = tf.Session()
+        config = tf.ConfigProto(
+            device_count = {'GPU': 0}
+        )
+        session = tf.Session(config=config)
     else:
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
