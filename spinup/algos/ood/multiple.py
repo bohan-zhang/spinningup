@@ -48,13 +48,13 @@ class ReplayBuffer:
 def run_multiple(algorithms, sample_from, replay_buffer, batch_size=100, epochs=100, max_ep_len=1000, start_steps=10000,
                  steps_per_epoch=5000):
     start_time = time.time()
-    interactions = 0
-    steps_per_epoch //= len(sample_from)
+    n_alg = len(algorithms)
     total_steps = steps_per_epoch * epochs
     steps = [[a.env.reset(), None, 0, False, 0, 0] for a in algorithms]  # o, o2, r, d, ep_ret, ep_len
 
     # Main loop: collect experience in env and update/log each epoch
-    for t in range(total_steps):
+    t = 0
+    while t < total_steps:
 
         """
         Until start_steps have elapsed, randomly sample actions
@@ -82,7 +82,7 @@ def run_multiple(algorithms, sample_from, replay_buffer, batch_size=100, epochs=
 
             # Store experiences to replay buffer
             replay_buffer.store(o, a, r, o2, d)
-            interactions += 1
+            t += 1
 
             # Super critical, easy to overlook step: make sure to update
             # most recent observation!
@@ -104,7 +104,7 @@ def run_multiple(algorithms, sample_from, replay_buffer, batch_size=100, epochs=
                      algorithm.r_ph: batch['rews'],
                      algorithm.d_ph: batch['done']
                      }
-        update_ops, callbacks = zip(*[a.get_batch_update_ops(t) for a in algorithms])
+        update_ops, callbacks = zip(*[a.get_batch_update_ops(t // n_alg) for a in algorithms])
 
         outs = algorithm.sess.run(list(chain.from_iterable(update_ops)), feed_dict)
 
@@ -113,10 +113,10 @@ def run_multiple(algorithms, sample_from, replay_buffer, batch_size=100, epochs=
             callbacks[i](outs[start:end])
 
         # End of epoch wrap-up
-        if t > 0 and t % steps_per_epoch == 0:
+        if t > 0 and (t // n_alg) % (steps_per_epoch // n_alg) == 0:
             epoch = t // steps_per_epoch
             for algorithm in algorithms:
-                algorithm.wrap_up_epoch(epoch, interactions, start_time)
+                algorithm.wrap_up_epoch(epoch, t, start_time)
                 sys.stdout.flush()
 
 
