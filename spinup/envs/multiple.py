@@ -6,9 +6,12 @@ import sys
 from spinup.algos.sac import core as sac_core
 from spinup.algos.ddpg import core as ddpg_core
 from spinup.algos.td3 import core as td3_core
+from spinup.algos.std3 import core as std3_core
 from spinup.algos.ood.sac import SAC
 from spinup.algos.ood.ddpg import DDPG
 from spinup.algos.ood.td3 import TD3
+from spinup.algos.ood.std3 import STD3
+from spinup.envs.double_hill import DoubleHillEnv
 from spinup.envs import DoubleHillEnv, DoubleZigZag, SlantedRidge
 
 
@@ -214,6 +217,13 @@ if __name__ == '__main__':
                     ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), gamma=args.gamma, seed=args.seed,
                     epochs=args.epochs, logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs,
                     max_ep_len=args.max_ep_len)
+            )
+        elif algo == 'std3':
+            all_algorithms.append(
+                STD3(session, rb, lambda: make_env(args.env), actor_critic=std3_core.mlp_actor_critic,
+                     ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), gamma=args.gamma, seed=args.seed,
+                     epochs=args.epochs, logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs,
+                     max_ep_len=args.max_ep_len)
             )
 
     sf = tuple(
