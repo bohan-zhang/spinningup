@@ -186,15 +186,18 @@ def std3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     # Bellman backup for Q functions, using Clipped Double-Q targets
     min_q_targ = tf.minimum(q1_targ, q2_targ)
-    q_backup = tf.stop_gradient(r_ph + gamma * (1 - d_ph) * (beta * v_targ + (1 - beta) * min_q_targ))
+    q_backup = tf.stop_gradient(r_ph + gamma * (1 - d_ph) * min_q_targ)
+    q_soft_backup = tf.stop_gradient(r_ph + gamma * (1 - d_ph) * v_targ)
     v_backup = tf.stop_gradient(min_q_pi - alpha * logp_pi)
 
     # TD3 losses
     pi_loss = tf.reduce_mean(alpha * logp_pi - q1_pi)
-    q1_loss = tf.reduce_mean((q1 - q_backup) ** 2)
-    q2_loss = tf.reduce_mean((q2 - q_backup) ** 2)
+    q1_loss = 0.5 * tf.reduce_mean((q1 - q_backup) ** 2)
+    q2_loss = 0.5 * tf.reduce_mean((q2 - q_backup) ** 2)
+    q1_soft_loss = 0.5 * tf.reduce_mean((q1 - q_soft_backup) ** 2)
+    q2_soft_loss = 0.5 * tf.reduce_mean((q2 - q_soft_backup) ** 2)
     v_loss = 0.5 * tf.reduce_mean((v_backup - v) ** 2)
-    value_loss = q1_loss + q2_loss + v_loss
+    value_loss = beta * (q1_soft_loss + q2_soft_loss) + (1 - beta) * (q1_loss + q2_loss) + v_loss
 
     # Policy train op
     pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
