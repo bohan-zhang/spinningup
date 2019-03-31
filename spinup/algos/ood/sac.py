@@ -148,7 +148,7 @@ class SAC:
         v_backup = tf.stop_gradient(min_q_pi - alpha * logp_pi)
 
         # Soft actor-critic losses
-        pi_loss = tf.reduce_mean(alpha * logp_pi - min_q_pi)
+        pi_loss = tf.reduce_mean(alpha * logp_pi - q1_pi)
         q1_loss = 0.5 * tf.reduce_mean((q_backup - q1) ** 2)
         q2_loss = 0.5 * tf.reduce_mean((q_backup - q2) ** 2)
         v_loss = 0.5 * tf.reduce_mean((v_backup - v) ** 2)
@@ -164,7 +164,6 @@ class SAC:
         value_optimizer = tf.train.AdamOptimizer(learning_rate=lr)
         value_params = get_vars('%s/main/q' % name) + get_vars('%s/main/v' % name)
         with tf.control_dependencies([train_pi_op]):
-            # train_value_op = value_optimizer.minimize(value_loss, var_list=value_params)
             # Calculate gradients for Q function
             variables = get_vars('%s/main/q' % name) + [x_ph, a_ph]
             grads = tf.gradients(value_loss, variables)
