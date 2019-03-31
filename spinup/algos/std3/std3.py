@@ -46,7 +46,7 @@ STD3 (Soft Twin Delayed DDPG)
 
 
 def std3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
-         steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, alpha=0.2,
+         steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, alpha=0.2, beta=0.5,
          polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000,
          act_noise=0.1, target_noise=0.2, noise_clip=0.5, policy_delay=2,
          max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
@@ -107,6 +107,8 @@ def std3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         alpha (float): Entropy regularization coefficient. (Equivalent to
             inverse of reward scale in the original SAC paper.)
 
+        beta (float): Soft factor. (Always between 0 and 1)
+
         batch_size (int): Minibatch size for SGD.
 
         start_steps (int): Number of steps for uniform-random action selection,
@@ -154,11 +156,11 @@ def std3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     # Main outputs from computation graph
     with tf.variable_scope('main'):
-        mu, pi, logp_pi, q1, q2, q1_pi = actor_critic(x_ph, a_ph, **ac_kwargs)
+        mu, pi, logp_pi, q1, q2, q1_pi, q2_pi, v = actor_critic(x_ph, a_ph, **ac_kwargs)
 
     # Target policy network
     with tf.variable_scope('target'):
-        pi_targ, _, _, _, _, _ = actor_critic(x2_ph, a_ph, **ac_kwargs)
+        pi_targ, _, _, _, _, _, _, v_targ = actor_critic(x2_ph, a_ph, **ac_kwargs)
 
     # Target Q networks
     with tf.variable_scope('target', reuse=True):
@@ -170,7 +172,7 @@ def std3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         a2 = tf.clip_by_value(a2, -act_limit, act_limit)
 
         # Target Q-values, using action from target policy
-        _, _, _, q1_targ, q2_targ, _ = actor_critic(x2_ph, a2, **ac_kwargs)
+        _, _, _, q1_targ, q2_targ, _, _, _ = actor_critic(x2_ph, a2, **ac_kwargs)
 
     # Experience buffer
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
@@ -179,25 +181,35 @@ def std3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     var_counts = tuple(core.count_vars(scope) for scope in ['main/pi', 'main/q1', 'main/q2', 'main'])
     print('\nNumber of parameters: \t pi: %d, \t q1: %d, \t q2: %d, \t total: %d\n' % var_counts)
 
+    # Min Double-Q:
+    min_q_pi = tf.minimum(q1_pi, q2_pi)
+
     # Bellman backup for Q functions, using Clipped Double-Q targets
     min_q_targ = tf.minimum(q1_targ, q2_targ)
-    backup = tf.stop_gradient(r_ph + gamma * (1 - d_ph) * min_q_targ)
+    q_backup = tf.stop_gradient(r_ph + gamma * (1 - d_ph) * (beta * v_targ + (1 - beta) * min_q_targ))
+    v_backup = tf.stop_gradient(min_q_pi - alpha * logp_pi)
 
     # TD3 losses
     pi_loss = tf.reduce_mean(alpha * logp_pi - q1_pi)
-    q1_loss = tf.reduce_mean((q1 - backup) ** 2)
-    q2_loss = tf.reduce_mean((q2 - backup) ** 2)
-    q_loss = q1_loss + q2_loss
+    q1_loss = tf.reduce_mean((q1 - q_backup) ** 2)
+    q2_loss = tf.reduce_mean((q2 - q_backup) ** 2)
+    v_loss = 0.5 * tf.reduce_mean((v_backup - v) ** 2)
+    value_loss = q1_loss + q2_loss + v_loss
 
-    # Separate train ops for pi, q
+    # Policy train op
     pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
-    q_optimizer = tf.train.AdamOptimizer(learning_rate=q_lr)
     train_pi_op = pi_optimizer.minimize(pi_loss, var_list=get_vars('main/pi'))
-    train_q_op = q_optimizer.minimize(q_loss, var_list=get_vars('main/q'))
+
+    # Value train op
+    value_optimizer = tf.train.AdamOptimizer(learning_rate=q_lr)
+    value_params = get_vars('main/q') + get_vars('main/v')
+    with tf.control_dependencies([train_pi_op]):
+        train_value_op = value_optimizer.minimize(value_loss, var_list=value_params)
 
     # Polyak averaging for target variables
-    target_update = tf.group([tf.assign(v_targ, polyak * v_targ + (1 - polyak) * v_main)
-                              for v_main, v_targ in zip(get_vars('main'), get_vars('target'))])
+    with tf.control_dependencies([train_value_op]):
+        target_update = tf.group([tf.assign(v_targ, polyak * v_targ + (1 - polyak) * v_main) for v_main, v_targ in
+                                  zip(get_vars('main'), get_vars('target'))])
 
     # Initializing targets to match main variables
     target_init = tf.group([tf.assign(v_targ, v_main)
@@ -272,7 +284,7 @@ def std3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                              r_ph: batch['rews'],
                              d_ph: batch['done']
                              }
-                q_step_ops = [q_loss, q1, q2, train_q_op]
+                q_step_ops = [value_loss, q1, q2, train_value_op]
                 outs = sess.run(q_step_ops, feed_dict)
                 logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2])
 
@@ -319,6 +331,7 @@ if __name__ == '__main__':
     parser.add_argument('--l', type=int, default=1)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--alpha', type=float, default=0.2)
+    parser.add_argument('--beta', type=float, default=0.5)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--exp_name', type=str, default='std3')
@@ -330,5 +343,5 @@ if __name__ == '__main__':
 
     std3(lambda: gym.make(args.env), actor_critic=core.mlp_actor_critic,
          ac_kwargs=dict(hidden_sizes=[args.hid] * args.l),
-         gamma=args.gamma, seed=args.seed, epochs=args.epochs, alpha=args.alpha,
+         gamma=args.gamma, seed=args.seed, epochs=args.epochs, alpha=args.alpha, beta=args.beta,
          logger_kwargs=logger_kwargs)
