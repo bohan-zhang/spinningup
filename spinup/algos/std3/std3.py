@@ -160,19 +160,7 @@ def std3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     # Target policy network
     with tf.variable_scope('target'):
-        pi_targ, _, _, _, _, _, _, v_targ = actor_critic(x2_ph, a_ph, **ac_kwargs)
-
-    # Target Q networks
-    with tf.variable_scope('target', reuse=True):
-
-        # Target policy smoothing, by adding clipped noise to target actions
-        epsilon = tf.random_normal(tf.shape(pi_targ), stddev=target_noise)
-        epsilon = tf.clip_by_value(epsilon, -noise_clip, noise_clip)
-        a2 = pi_targ + epsilon
-        a2 = tf.clip_by_value(a2, -act_limit, act_limit)
-
-        # Target Q-values, using action from target policy
-        _, _, _, q1_targ, q2_targ, _, _, _ = actor_critic(x2_ph, a2, **ac_kwargs)
+        pi_targ, _, _, q1_targ, q2_targ, _, _, v_targ = actor_critic(x2_ph, a_ph, **ac_kwargs)
 
     # Experience buffer
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
