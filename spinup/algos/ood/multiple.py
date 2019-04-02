@@ -137,6 +137,7 @@ if __name__ == '__main__':
     parser.add_argument('--sample_from', type=str, default='', help='0-based index of algorithm to sample action from')
     parser.add_argument('--spectral_norm', type=float, default=0.0)
     parser.add_argument('--regularizer', type=float, default=0.0)
+    parser.add_argument('--gradient_penalty', type=float, default=0.0)
     parser.add_argument('--no_gpu', type=bool, default=False)
     parser.add_argument('--max_ep_len', type=int, default=1e3)
     parser.set_defaults(spectral_norm=False)
@@ -186,7 +187,7 @@ if __name__ == '__main__':
                 DDPG(session, rb, lambda: gym.make(args.env), actor_critic=ddpg_core.mlp_actor_critic,
                      ac_kwargs=dict(hidden_sizes=[args.hid] * args.l, sn=args.spectral_norm, reg=args.regularizer),
                      gamma=args.gamma, seed=args.seed, epochs=args.epochs, max_ep_len=args.max_ep_len,
-                     logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs)
+                     logger_kwargs=logger_kwargs, name=algorithm_name, phs=phs, gp=args.gradient_penalty)
             )
         elif algo == 'td3':
             all_algorithms.append(
