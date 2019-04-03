@@ -259,7 +259,7 @@ class DDPG:
                           LossPi=outs[len(q_update_ops)])
 
     def get_batch_update_ops(self, step):
-        q_update_ops = [self.q_loss, self.q, self.train_q_op, self.s_a_norm, self.pairwise_q_sa_ratio]
+        q_update_ops = [self.q_loss, self.q, self.train_q_op, self.s_a_norm, self.a_norm, self.pairwise_q_sa_ratio]
         ops = q_update_ops + [self.pi_loss, self.train_pi_op, self.target_update]
         callback = lambda outs: self.logger.store(LossQ=outs[0], QVals=outs[1], Norm=outs[3], ANorm=outs[4],
                                                   QSa=outs[5], LossPi=outs[len(q_update_ops)])
