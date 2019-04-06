@@ -49,7 +49,7 @@ class DDPG:
     def __init__(self, sess, replay_buffer, env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                  steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, polyak=0.995, pi_lr=1e-3,
                  q_lr=1e-3, batch_size=100, start_steps=10000, act_noise=0.1, max_ep_len=1000, logger_kwargs=dict(),
-                 save_freq=1, name='ddpg', phs=None, gp=1e-2):
+                 save_freq=1, name='ddpg', phs=None, gp=0, sa_gp=0):
         """
 
         Args:
@@ -180,13 +180,15 @@ class DDPG:
         s_a_grads = tf.concat(grads[-2:], axis=1)
         s_a_norm = tf.norm(s_a_grads, axis=1)
         a_norm = tf.norm(grads[-1], axis=1)
+        mean_s_a_norm = tf.reduce_mean(tf.sqrt(tf.reduce_sum(tf.square(s_a_grads) + 1e-10, axis=1)))
         mean_a_norm = tf.reduce_mean(tf.sqrt(tf.reduce_sum(tf.square(grads[-1]) + 1e-10, axis=1)))
 
         pairwise_q_dist = pairwise_distance(tf.expand_dims(q, 1))
         pairwise_s_a_dist = pairwise_distance(tf.concat([x_ph, a_ph], axis=1))
         pairwise_q_sa_ratio = tf.reshape(pairwise_q_dist / (pairwise_s_a_dist + 1e-5), [-1])
 
-        train_q_op = q_optimizer.minimize(q_loss + gp * mean_a_norm, var_list=get_vars('%s/main/q' % name))
+        penalized_loss = q_loss + gp * mean_a_norm + sa_gp * mean_s_a_norm
+        train_q_op = q_optimizer.minimize(penalized_loss, var_list=get_vars('%s/main/q' % name))
 
         # Polyak averaging for target variables
         target_update = tf.group([tf.assign(v_targ, polyak * v_targ + (1 - polyak) * v_main)
